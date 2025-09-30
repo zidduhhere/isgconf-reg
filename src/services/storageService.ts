@@ -1,4 +1,4 @@
-import { Participant, MealSlot, MealClaim } from "../types";
+import { Participant, MealSlot, Coupon } from "../types";
 import { PARTICIPANTS, MEAL_SLOTS } from "../data/mockData";
 
 const STORAGE_KEYS = {
@@ -23,7 +23,7 @@ export const initializeData = (): void => {
 
   if (!localStorage.getItem(STORAGE_KEYS.MEAL_CLAIMS)) {
     // Initialize claims for all participants and meal slots
-    const claims: MealClaim[] = [];
+    const claims: Coupon[] = [];
     PARTICIPANTS.forEach((participant) => {
       MEAL_SLOTS.forEach((slot) => {
         // Create claims for each family member
@@ -72,16 +72,16 @@ export const getMealSlots = (): MealSlot[] => {
   return data ? JSON.parse(data) : [];
 };
 
-export const getMealClaims = (): MealClaim[] => {
+export const getCoupons = (): Coupon[] => {
   const data = localStorage.getItem(STORAGE_KEYS.MEAL_CLAIMS);
   return data ? JSON.parse(data) : [];
 };
 
-export const updateMealClaim = (
+export const updateCoupon = (
   claimId: string,
-  updates: Partial<MealClaim>
+  updates: Partial<Coupon>
 ): void => {
-  const claims = getMealClaims();
+  const claims = getCoupons();
   const index = claims.findIndex((c) => c.id === claimId);
 
   if (index !== -1) {
@@ -90,6 +90,87 @@ export const updateMealClaim = (
   }
 };
 
-export const getUserClaims = (participantId: string): MealClaim[] => {
-  return getMealClaims().filter((c) => c.participantId === participantId);
+export const getUserClaims = (participantId: string): Coupon[] => {
+  return getCoupons().filter((c) => c.participantId === participantId);
+};
+
+// Admin functions for participant management
+export const getAllClaims = (): Coupon[] => {
+  return getCoupons();
+};
+
+export const addParticipant = (participant: Participant): boolean => {
+  try {
+    const participants = getParticipants();
+    participants.push(participant);
+    localStorage.setItem(STORAGE_KEYS.PARTICIPANTS, JSON.stringify(participants));
+    return true;
+  } catch (error) {
+    console.error('Error adding participant:', error);
+    return false;
+  }
+};
+
+export const updateParticipant = (id: string, updates: Partial<Participant>): boolean => {
+  try {
+    const participants = getParticipants();
+    const index = participants.findIndex(p => p.id === id);
+    
+    if (index !== -1) {
+      participants[index] = { ...participants[index], ...updates };
+      localStorage.setItem(STORAGE_KEYS.PARTICIPANTS, JSON.stringify(participants));
+      return true;
+    }
+    return false;
+  } catch (error) {
+    console.error('Error updating participant:', error);
+    return false;
+  }
+};
+
+export const deleteParticipant = (id: string): boolean => {
+  try {
+    const participants = getParticipants();
+    const filteredParticipants = participants.filter(p => p.id !== id);
+    localStorage.setItem(STORAGE_KEYS.PARTICIPANTS, JSON.stringify(filteredParticipants));
+    
+    // Also remove all claims for this participant
+    const claims = getCoupons();
+    const filteredClaims = claims.filter(c => c.participantId !== id);
+    localStorage.setItem(STORAGE_KEYS.MEAL_CLAIMS, JSON.stringify(filteredClaims));
+    
+    return true;
+  } catch (error) {
+    console.error('Error deleting participant:', error);
+    return false;
+  }
+};
+
+export const initializeClaimsForParticipant = (participant: Participant): void => {
+  const mealSlots = getMealSlots();
+  const existingClaims = getCoupons();
+  const newClaims: Coupon[] = [];
+  
+  mealSlots.forEach(slot => {
+    // Create claims for each family member
+    for (let i = 0; i < participant.familySize; i++) {
+      const claimId = `${participant.id}-${slot.id}-${i}`;
+      
+      // Only add if claim doesn't already exist
+      if (!existingClaims.find(c => c.id === claimId)) {
+        newClaims.push({
+          id: claimId,
+          participantId: participant.id,
+          mealSlotId: slot.id,
+          familyMemberIndex: i,
+          status: 'available'
+        });
+      }
+    }
+  });
+  
+  if (newClaims.length > 0) {
+    const allClaims = [...existingClaims, ...newClaims];
+    localStorage.setItem(STORAGE_KEYS.MEAL_CLAIMS, JSON.stringify(allClaims));
+  }
 };

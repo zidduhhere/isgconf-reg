@@ -1,11 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { Clock, CheckCircle, XCircle, Star, X, Check, Users } from 'lucide-react';
-import { MealSlot, MealClaim, Participant } from '../types';
+import { MealSlot, Coupon, Participant } from '../types';
 import { formatTimeRemaining } from '../utils/timeUtils';
 
 interface FamilyCouponCardProps {
     mealSlot: MealSlot;
-    claim: MealClaim;
+    claim: Coupon;
     onClaim: (mealSlotId: string, isFamily: boolean) => void;
     timeRemaining?: number;
     participant: Participant;

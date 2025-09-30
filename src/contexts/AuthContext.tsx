@@ -11,7 +11,6 @@ import {
 interface AuthContextType {
     // State
     currentUser: Participant | null;
-    currentView: 'landing' | 'login' | 'dashboard';
     loginError: string | null;
     isLoading: boolean;
     isInitializing: boolean;
@@ -19,7 +18,6 @@ interface AuthContextType {
     // Actions
     login: (phoneNumber: string) => Promise<void>;
     logout: () => void;
-    setCurrentView: (view: 'landing' | 'login' | 'dashboard') => void;
     clearLoginError: () => void;
 }
 
@@ -31,7 +29,6 @@ interface AuthProviderProps {
 
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     const [currentUser, setCurrentUserState] = useState<Participant | null>(null);
-    const [currentView, setCurrentView] = useState<'landing' | 'login' | 'dashboard'>('login');
     const [loginError, setLoginError] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(false);
     const [isInitializing, setIsInitializing] = useState(true);
@@ -42,7 +39,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         const existingUser = getCurrentUser();
         if (existingUser) {
             setCurrentUserState(existingUser);
-            setCurrentView('dashboard');
         }
         setIsInitializing(false);
     }, []);
@@ -60,7 +56,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             if (participant) {
                 setStorageCurrentUser(participant);
                 setCurrentUserState(participant);
-                setCurrentView('dashboard');
             } else {
                 setLoginError('Phone number not found. Please check your number or contact event support.');
             }
@@ -74,7 +69,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     const logout = (): void => {
         clearCurrentUser();
         setCurrentUserState(null);
-        setCurrentView('login');
         setLoginError(null);
     };
 
@@ -85,7 +79,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     const value: AuthContextType = {
         // State
         currentUser,
-        currentView,
         loginError,
         isLoading,
         isInitializing,
@@ -93,7 +86,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         // Actions
         login,
         logout,
-        setCurrentView,
         clearLoginError
     };
 

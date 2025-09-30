@@ -16,7 +16,7 @@ export interface MealSlot {
   eventDate: string; // YYYY-MM-DD format
 }
 
-export interface MealClaim {
+export interface Coupon {
   id: string;
   participantId: string;
   mealSlotId: string;
@@ -28,7 +28,7 @@ export interface MealClaim {
 
 export interface MealCardProps {
   mealSlot: MealSlot;
-  claim: MealClaim;
+  claim: Coupon;
   onClaim: (mealSlotId: string, familyMemberIndex: number) => void;
   timeRemaining?: number;
   familyMemberIndex: number;
@@ -38,9 +38,17 @@ export interface MealCardProps {
 export interface CouponSetProps {
   participant: Participant;
   familyMemberIndex: number;
-  familyMemberName: string;
   mealSlots: MealSlot[];
-  claims: MealClaim[];
+  claims: Coupon[];
   countdowns: { [key: string]: number };
   onClaim: (mealSlotId: string, familyMemberIndex: number) => void;
+}
+
+
+export interface RegistrationSlot {
+  id: string;
+  particpant: Participant;
+  date: string;
+  time: string;
+  isRegistered: boolean;
 }

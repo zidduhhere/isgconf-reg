@@ -1,10 +1,19 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { Smartphone, ArrowRight, Stethoscope, Shield, Users, Award } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
 export const LoginForm: React.FC = () => {
-  const { login, setCurrentView, loginError, isLoading } = useAuth();
+  const { login, loginError, isLoading, currentUser } = useAuth();
+  const navigate = useNavigate();
   const [phoneNumber, setPhoneNumber] = useState('');
+
+  // Redirect to dashboard if already logged in
+  useEffect(() => {
+    if (currentUser) {
+      navigate('/dashboard');
+    }
+  }, [currentUser, navigate]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -16,10 +25,6 @@ export const LoginForm: React.FC = () => {
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     setPhoneNumber(value);
-  };
-
-  const handleNavigateToLanding = () => {
-    setCurrentView('landing');
   };
 
   return (
@@ -154,7 +159,7 @@ export const LoginForm: React.FC = () => {
                       id="mobilenumber"
                       value={phoneNumber}
                       onChange={handlePhoneChange}
-                      placeholder="+91 9876543210"
+                      placeholder="9876543210"
                       className="w-full pl-9 sm:pl-10 pr-4 py-3 sm:py-3 bg-neutral-50 border border-neutral-200 rounded-lg text-sm sm:text-base text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-300"
                     />
                     <Smartphone className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-neutral-400" />
@@ -200,12 +205,12 @@ export const LoginForm: React.FC = () => {
               </div>
 
               {/* Navigation Button */}
-              <button
-                onClick={handleNavigateToLanding}
+              <Link
+                to="/"
                 className="w-full bg-neutral-100 hover:bg-neutral-200 text-neutral-700 font-medium py-2.5 px-3 sm:px-4 rounded-lg transition-all duration-300 transform hover:scale-[1.02] flex items-center justify-center gap-2 text-xs sm:text-sm"
               >
                 <span>← Back to Event Information</span>
-              </button>
+              </Link>
 
               {/* Security Badge */}
               <div className="mt-3 sm:mt-4 text-center">

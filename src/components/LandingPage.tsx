@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
 import {
     ArrowRight,
     Calendar,
@@ -15,16 +16,11 @@ import {
     BookOpen,
     Camera,
     ChevronRight,
+    Settings,
 } from 'lucide-react';
-import { useAuth } from '../contexts/AuthContext';
 
 export const LandingPage: React.FC = () => {
-    const { setCurrentView } = useAuth();
     const [isDrawerOpen, setIsDrawerOpen] = useState(false);
-
-    const handleNavigateToLogin = () => {
-        setCurrentView('login');
-    };
 
     const menuItems = [
         { label: 'Home', href: '#home' },
@@ -146,15 +142,13 @@ export const LandingPage: React.FC = () => {
                                     <ChevronRight className="w-5 h-5" />
                                 </a>
                             ))}
-                            <button
-                                onClick={() => {
-                                    handleNavigateToLogin();
-                                    setIsDrawerOpen(false);
-                                }}
-                                className="w-full mt-8 bg-primary-600 text-white py-4 px-6 rounded-xl font-semibold hover:bg-primary-700 transition-colors"
+                            <Link
+                                to="/login"
+                                onClick={() => setIsDrawerOpen(false)}
+                                className="w-full mt-8 bg-primary-600 text-white py-4 px-6 rounded-xl font-semibold hover:bg-primary-700 transition-colors text-center block"
                             >
                                 Access Portal
-                            </button>
+                            </Link>
                         </nav>
                     </div>
                 </div>
@@ -181,12 +175,12 @@ export const LandingPage: React.FC = () => {
                         smart diagnostic tools, and seamless patient care tracking.
                     </p>
 
-                    <button
-                        onClick={handleNavigateToLogin}
+                    <Link
+                        to="/login"
                         className="bg-primary-600 hover:bg-primary-700 text-white px-10 py-4 rounded-xl text-lg transition-all duration-300 transform hover:scale-105 hover:shadow-xl inline-flex items-center gap-3 animate-scale-in mb-16"
                     >
                         Let's Access the portal <ArrowRight className="w-5 h-5" />
-                    </button>
+                    </Link>
 
                     {/* Dashboard Preview Placeholder */}
                     <div className="relative max-w-2xl mx-auto animate-scale-in">
@@ -367,12 +361,12 @@ export const LandingPage: React.FC = () => {
 
                     {/* Call to Action */}
                     <div className="text-center mt-16">
-                        <button
-                            onClick={handleNavigateToLogin}
+                        <Link
+                            to="/login"
                             className="bg-primary-600 hover:bg-primary-700 text-white px-10 py-4 rounded-xl text-lg font-semibold transition-all duration-300 transform hover:scale-105 hover:shadow-xl inline-flex items-center gap-3"
                         >
                             Register Now <ArrowRight className="w-5 h-5" />
-                        </button>
+                        </Link>
                     </div>
                 </div>
             </section>

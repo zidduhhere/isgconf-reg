@@ -80,14 +80,5 @@ export const MEAL_SLOTS: MealSlot[] = [
     startTime: "12:00",
     endTime: "14:00",
     eventDate: eventDay2.toISOString().split("T")[0],
-  },
-  {
-    id: "day2-dinner",
-    name: "Dinner - Day 2",
-    day: 2,
-    type: "dinner",
-    startTime: "18:00",
-    endTime: "20:00",
-    eventDate: eventDay2.toISOString().split("T")[0],
-  },
+  }
 ];

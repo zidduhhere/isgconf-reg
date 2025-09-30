@@ -1,4 +1,5 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import { LogOut, User, Utensils, Users } from 'lucide-react';
 import { MealCard } from './MealCard';
 import { FamilyCouponCard } from './FamilyCouponCard';
@@ -8,6 +9,7 @@ import { useCoupon } from '../contexts/CouponContext';
 export const Dashboard: React.FC = () => {
   const { currentUser, logout } = useAuth();
   const { mealSlots, getClaimForSlot, getTimeRemaining, claimMeal, claimFamilyMeal } = useCoupon();
+  const navigate = useNavigate();
 
   if (!currentUser) {
     return null; // This shouldn't happen, but just in case
@@ -15,6 +17,7 @@ export const Dashboard: React.FC = () => {
 
   const handleLogout = () => {
     logout();
+    navigate('/login');
   }; return (
     <div className="min-h-screen relative overflow-hidden">
       {/* Animated Background with Blur Gradients */}

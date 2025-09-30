@@ -1,15 +1,15 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { Participant, MealSlot, MealClaim } from '../types';
+import { Participant, MealSlot, Coupon } from '../types';
 import {
     getMealSlots,
     getUserClaims,
-    updateMealClaim
+    updateCoupon
 } from '../services/storageService';
 
 interface CouponContextType {
     // State
     mealSlots: MealSlot[];
-    claims: MealClaim[];
+    claims: Coupon[];
     countdowns: { [key: string]: number };
 
     // Actions
@@ -19,7 +19,7 @@ interface CouponContextType {
     expireClaim: (claimId: string) => void;
 
     // Getters
-    getClaimForSlot: (mealSlotId: string, familyMemberIndex?: number) => MealClaim | undefined;
+    getClaimForSlot: (mealSlotId: string, familyMemberIndex?: number) => Coupon | undefined;
     getTimeRemaining: (mealSlotId: string) => number | undefined;
 }
 
@@ -30,9 +30,25 @@ interface CouponProviderProps {
     participant: Participant | null;
 }
 
+
+/**
+ * Claims a meal for a participant at a specific meal slot and family member index.
+ * If a claim exists and is available, it will be updated to 'active' status with
+ * an expiration time of 15 minutes from the current time.
+ * 
+ * @param mealSlotId - The ID of the meal slot to claim
+ * @param familyMemberIndex - Optional index indicating which family member the claim is for (defaults to 0)
+ * @returns void
+ * 
+ * @remarks
+ * - Will return early if no participant is provided
+ * - Only processes the claim if an available claim exists for the given mealSlotId and familyMemberIndex
+ * - Sets claimedAt to current time and expiresAt to 15 minutes from current time
+ * - Automatically reloads claims after updating
+ */
 export const CouponProvider: React.FC<CouponProviderProps> = ({ children, participant }) => {
     const [mealSlots] = useState<MealSlot[]>(getMealSlots());
-    const [claims, setClaims] = useState<MealClaim[]>([]);
+    const [claims, setClaims] = useState<Coupon[]>([]);
     const [countdowns, setCountdowns] = useState<{ [key: string]: number }>({});
 
     useEffect(() => {
@@ -81,7 +97,7 @@ export const CouponProvider: React.FC<CouponProviderProps> = ({ children, partic
     };
 
     const expireClaim = (claimId: string): void => {
-        updateMealClaim(claimId, {
+        updateCoupon(claimId, {
             status: 'used'
         });
 
@@ -112,7 +128,7 @@ export const CouponProvider: React.FC<CouponProviderProps> = ({ children, partic
             const now = new Date();
             const expiresAt = new Date(now.getTime() + 15 * 60 * 1000); // 15 minutes from now
 
-            updateMealClaim(claim.id, {
+            updateCoupon(claim.id, {
                 status: 'active',
                 claimedAt: now.toISOString(),
                 expiresAt: expiresAt.toISOString()
@@ -134,7 +150,7 @@ export const CouponProvider: React.FC<CouponProviderProps> = ({ children, partic
                 const now = new Date();
                 const expiresAt = new Date(now.getTime() + 15 * 60 * 1000); // 15 minutes from now
 
-                updateMealClaim(claim.id, {
+                updateCoupon(claim.id, {
                     status: 'active',
                     claimedAt: now.toISOString(),
                     expiresAt: expiresAt.toISOString()
@@ -145,7 +161,7 @@ export const CouponProvider: React.FC<CouponProviderProps> = ({ children, partic
         loadClaims(participant.id);
     };
 
-    const getClaimForSlot = (mealSlotId: string, familyMemberIndex: number = 0): MealClaim | undefined => {
+    const getClaimForSlot = (mealSlotId: string, familyMemberIndex: number = 0): Coupon | undefined => {
         return claims.find(c =>
             c.mealSlotId === mealSlotId &&
             c.familyMemberIndex === familyMemberIndex
