@@ -1,43 +1,52 @@
-import { Participant, MealSlot, MealClaim } from '../types';
-import { PARTICIPANTS, MEAL_SLOTS } from '../data/mockData';
+import { Participant, MealSlot, MealClaim } from "../types";
+import { PARTICIPANTS, MEAL_SLOTS } from "../data/mockData";
 
 const STORAGE_KEYS = {
-  PARTICIPANTS: 'meal_pass_participants',
-  MEAL_SLOTS: 'meal_pass_slots',
-  MEAL_CLAIMS: 'meal_pass_claims',
-  CURRENT_USER: 'meal_pass_current_user'
+  PARTICIPANTS: "meal_pass_participants",
+  MEAL_SLOTS: "meal_pass_slots",
+  MEAL_CLAIMS: "meal_pass_claims",
+  CURRENT_USER: "meal_pass_current_user",
 };
 
 // Initialize data in localStorage
 export const initializeData = (): void => {
   if (!localStorage.getItem(STORAGE_KEYS.PARTICIPANTS)) {
-    localStorage.setItem(STORAGE_KEYS.PARTICIPANTS, JSON.stringify(PARTICIPANTS));
+    localStorage.setItem(
+      STORAGE_KEYS.PARTICIPANTS,
+      JSON.stringify(PARTICIPANTS)
+    );
   }
-  
+
   if (!localStorage.getItem(STORAGE_KEYS.MEAL_SLOTS)) {
     localStorage.setItem(STORAGE_KEYS.MEAL_SLOTS, JSON.stringify(MEAL_SLOTS));
   }
-  
+
   if (!localStorage.getItem(STORAGE_KEYS.MEAL_CLAIMS)) {
     // Initialize claims for all participants and meal slots
     const claims: MealClaim[] = [];
-    PARTICIPANTS.forEach(participant => {
-      MEAL_SLOTS.forEach(slot => {
-        claims.push({
-          id: `${participant.id}-${slot.id}`,
-          participantId: participant.id,
-          mealSlotId: slot.id,
-          status: 'available'
-        });
+    PARTICIPANTS.forEach((participant) => {
+      MEAL_SLOTS.forEach((slot) => {
+        // Create claims for each family member
+        for (let i = 0; i < participant.familySize; i++) {
+          claims.push({
+            id: `${participant.id}-${slot.id}-${i}`,
+            participantId: participant.id,
+            mealSlotId: slot.id,
+            familyMemberIndex: i,
+            status: "available",
+          });
+        }
       });
     });
     localStorage.setItem(STORAGE_KEYS.MEAL_CLAIMS, JSON.stringify(claims));
   }
 };
 
-export const authenticateParticipant = (phoneNumber: string): Participant | null => {
+export const authenticateParticipant = (
+  phoneNumber: string
+): Participant | null => {
   const participants = getParticipants();
-  return participants.find(p => p.phoneNumber === phoneNumber) || null;
+  return participants.find((p) => p.phoneNumber === phoneNumber) || null;
 };
 
 export const getCurrentUser = (): Participant | null => {
@@ -68,10 +77,13 @@ export const getMealClaims = (): MealClaim[] => {
   return data ? JSON.parse(data) : [];
 };
 
-export const updateMealClaim = (claimId: string, updates: Partial<MealClaim>): void => {
+export const updateMealClaim = (
+  claimId: string,
+  updates: Partial<MealClaim>
+): void => {
   const claims = getMealClaims();
-  const index = claims.findIndex(c => c.id === claimId);
-  
+  const index = claims.findIndex((c) => c.id === claimId);
+
   if (index !== -1) {
     claims[index] = { ...claims[index], ...updates };
     localStorage.setItem(STORAGE_KEYS.MEAL_CLAIMS, JSON.stringify(claims));
@@ -79,5 +91,5 @@ export const updateMealClaim = (claimId: string, updates: Partial<MealClaim>): v
 };
 
 export const getUserClaims = (participantId: string): MealClaim[] => {
-  return getMealClaims().filter(c => c.participantId === participantId);
+  return getMealClaims().filter((c) => c.participantId === participantId);
 };

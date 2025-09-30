@@ -1,26 +1,25 @@
 import React, { useState } from 'react';
 import { Smartphone, ArrowRight, Stethoscope, Shield, Users, Award } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
 
-interface LoginFormProps {
-  onLogin: (phoneNumber: string) => void;
-  onNavigateToLanding: () => void;
-  error: string | null;
-  isLoading: boolean;
-}
-
-export const LoginForm: React.FC<LoginFormProps> = ({ onLogin, onNavigateToLanding, error, isLoading }) => {
+export const LoginForm: React.FC = () => {
+  const { login, setCurrentView, loginError, isLoading } = useAuth();
   const [phoneNumber, setPhoneNumber] = useState('');
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (phoneNumber.trim()) {
-      onLogin(phoneNumber.trim());
+      login(phoneNumber.trim());
     }
   };
 
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     setPhoneNumber(value);
+  };
+
+  const handleNavigateToLanding = () => {
+    setCurrentView('landing');
   };
 
   return (
@@ -162,11 +161,11 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onLogin, onNavigateToLandi
                   </div>
                 </div>
 
-                {error && (
+                {loginError && (
                   <div className="bg-red-50 border border-red-200 rounded-lg p-2 sm:p-3 animate-slide-up">
                     <div className="flex items-center gap-2">
                       <div className="w-2 h-2 bg-red-500 rounded-full"></div>
-                      <p className="text-red-700 text-xs sm:text-sm font-medium">{error}</p>
+                      <p className="text-red-700 text-xs sm:text-sm font-medium">{loginError}</p>
                     </div>
                   </div>
                 )}
@@ -202,7 +201,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onLogin, onNavigateToLandi
 
               {/* Navigation Button */}
               <button
-                onClick={onNavigateToLanding}
+                onClick={handleNavigateToLanding}
                 className="w-full bg-neutral-100 hover:bg-neutral-200 text-neutral-700 font-medium py-2.5 px-3 sm:px-4 rounded-lg transition-all duration-300 transform hover:scale-[1.02] flex items-center justify-center gap-2 text-xs sm:text-sm"
               >
                 <span>← Back to Event Information</span>

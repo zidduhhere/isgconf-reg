@@ -16,13 +16,15 @@ import {
     Camera,
     ChevronRight,
 } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
 
-interface LandingPageProps {
-    onNavigateToLogin: () => void;
-}
-
-export const LandingPage: React.FC<LandingPageProps> = ({ onNavigateToLogin }) => {
+export const LandingPage: React.FC = () => {
+    const { setCurrentView } = useAuth();
     const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+
+    const handleNavigateToLogin = () => {
+        setCurrentView('login');
+    };
 
     const menuItems = [
         { label: 'Home', href: '#home' },
@@ -146,7 +148,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onNavigateToLogin }) =
                             ))}
                             <button
                                 onClick={() => {
-                                    onNavigateToLogin();
+                                    handleNavigateToLogin();
                                     setIsDrawerOpen(false);
                                 }}
                                 className="w-full mt-8 bg-primary-600 text-white py-4 px-6 rounded-xl font-semibold hover:bg-primary-700 transition-colors"
@@ -180,7 +182,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onNavigateToLogin }) =
                     </p>
 
                     <button
-                        onClick={onNavigateToLogin}
+                        onClick={handleNavigateToLogin}
                         className="bg-primary-600 hover:bg-primary-700 text-white px-10 py-4 rounded-xl text-lg transition-all duration-300 transform hover:scale-105 hover:shadow-xl inline-flex items-center gap-3 animate-scale-in mb-16"
                     >
                         Let's Access the portal <ArrowRight className="w-5 h-5" />
@@ -366,7 +368,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onNavigateToLogin }) =
                     {/* Call to Action */}
                     <div className="text-center mt-16">
                         <button
-                            onClick={onNavigateToLogin}
+                            onClick={handleNavigateToLogin}
                             className="bg-primary-600 hover:bg-primary-700 text-white px-10 py-4 rounded-xl text-lg font-semibold transition-all duration-300 transform hover:scale-105 hover:shadow-xl inline-flex items-center gap-3"
                         >
                             Register Now <ArrowRight className="w-5 h-5" />

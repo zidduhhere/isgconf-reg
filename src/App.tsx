@@ -1,67 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { LoginForm } from './components/LoginForm';
 import { LandingPage } from './components/LandingPage';
 import { Dashboard } from './components/Dashboard';
-import { Participant } from './types';
-import {
-  initializeData,
-  authenticateParticipant,
-  getCurrentUser,
-  setCurrentUser
-} from './services/storageService';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { CouponProvider } from './contexts/CouponContext';
 
-function App() {
-  const [currentUser, setCurrentUserState] = useState<Participant | null>(null);
-  const [currentView, setCurrentView] = useState<'landing' | 'login' | 'dashboard'>('login');
-  const [loginError, setLoginError] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [isInitializing, setIsInitializing] = useState(true);
-
-  useEffect(() => {
-    // Initialize data and check for existing user session
-    initializeData();
-    const existingUser = getCurrentUser();
-    if (existingUser) {
-      setCurrentUserState(existingUser);
-      setCurrentView('dashboard');
-    }
-    setIsInitializing(false);
-  }, []);
-
-  const handleLogin = async (phoneNumber: string) => {
-    setIsLoading(true);
-    setLoginError(null);
-
-    try {
-      // Simulate network delay for better UX
-      await new Promise(resolve => setTimeout(resolve, 1000));
-
-      const participant = authenticateParticipant(phoneNumber);
-
-      if (participant) {
-
-        setCurrentUser(participant);
-        setCurrentUserState(participant);
-        setCurrentView('dashboard');
-      } else {
-        setLoginError('Phone number not found. Please check your number or contact event support.');
-      }
-    } catch (error) {
-      setLoginError('An error occurred during login. Please try again.');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const navigateToLogin = () => {
-    setCurrentView('login');
-    setLoginError(null);
-  };
-
-  const navigateToLanding = () => {
-    setCurrentView('landing');
-    setLoginError(null);
-  };
+const AppContent: React.FC = () => {
+  const { currentView, currentUser, isInitializing } = useAuth();
 
   if (isInitializing) {
     return (
@@ -75,23 +20,27 @@ function App() {
   }
 
   if (currentView === 'dashboard' && currentUser) {
-    return <Dashboard participant={currentUser} />;
-  }
-
-  if (currentView === 'landing') {
     return (
-      <LandingPage
-        onNavigateToLogin={navigateToLogin}
-      />
+      <CouponProvider participant={currentUser}>
+        <Dashboard />
+      </CouponProvider>
     );
   }
 
-  // Default to landing page
-  return <LoginForm
-    onLogin={handleLogin}
-    onNavigateToLanding={navigateToLanding}
-    error={loginError}
-    isLoading={isLoading} />;
+  if (currentView === 'landing') {
+    return <LandingPage />;
+  }
+
+  // Default to login
+  return <LoginForm />;
+};
+
+function App() {
+  return (
+    <AuthProvider>
+      <AppContent />
+    </AuthProvider>
+  );
 }
 
 export default App;

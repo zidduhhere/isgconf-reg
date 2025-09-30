@@ -2,11 +2,41 @@ import { Participant, MealSlot } from "../types";
 
 // Pre-loaded participants for the event
 export const PARTICIPANTS: Participant[] = [
-  { id: "1", phoneNumber: "9387307393", name: "Mr Rahul" },
-  { id: "2", phoneNumber: "7306522615", name: "Abi Alif" },
-  { id: "3", phoneNumber: "1234567890", name: "Bob Johnson" },
-  { id: "4", phoneNumber: "9812642164", name: "Alice Wilson" },
-  { id: "5", phoneNumber: "9071274621", name: "Charlie Brown" },
+  {
+    id: "1",
+    phoneNumber: "9387307393",
+    name: "Mr Rahul",
+    familySize: 3,
+    isFamily: true,
+  },
+  {
+    id: "2",
+    phoneNumber: "7306522615",
+    name: "Abi Alif",
+    familySize: 1,
+    isFamily: false,
+  },
+  {
+    id: "3",
+    phoneNumber: "1234567890",
+    name: "Bob Johnson",
+    familySize: 2,
+    isFamily: true,
+  },
+  {
+    id: "4",
+    phoneNumber: "9812642164",
+    name: "Alice Wilson",
+    familySize: 4,
+    isFamily: true,
+  },
+  {
+    id: "5",
+    phoneNumber: "9071274621",
+    name: "Charlie Brown",
+    familySize: 1,
+    isFamily: false,
+  },
   // Add more participants as needed - total 200
 ];
 
