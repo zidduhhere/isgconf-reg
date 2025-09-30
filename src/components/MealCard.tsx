@@ -45,7 +45,7 @@ export const MealCard: React.FC<MealCardProps> = ({
 
     switch (state) {
       case 'available':
-        return `${baseStyles} bg-gradient-to-br from-primary-200 via-primary-500 to-primary-600 hover:from-primary-500 hover:via-primary-600 hover:to-primary-700 cursor-pointer hover:shadow-2xl transform hover:-translate-y-2 hover:scale-105`;
+        return `${baseStyles} bg-gradient-to-br from-primary-400 via-primary-600 to-primary-800 hover:from-primary-500 hover:via-primary-600 hover:to-primary-700 cursor-pointer hover:shadow-2xl transform hover:-translate-y-2 hover:scale-105`;
       case 'active':
         return `${baseStyles} bg-gradient-to-br from-green-400 via-green-500 to-green-600 shadow-green-300 animate-pulse`;
       case 'used':
