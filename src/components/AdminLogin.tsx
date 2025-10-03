@@ -1,42 +1,46 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAdmin } from '../contexts/AdminContext';
-import { Shield, Eye, EyeOff, Lock, ArrowLeft } from 'lucide-react';
+import { Shield, Eye, EyeOff, Lock, ArrowLeft, Mail } from 'lucide-react';
 
 export const AdminLogin: React.FC = () => {
+    const [email, setEmail] = useState('admin@isgconf.com');
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
     const [error, setError] = useState('');
     const [isLoading, setIsLoading] = useState(false);
 
-    const { login, isAdminAuthenticated } = useAdmin();
+    const { login, currentAdmin } = useAdmin();
     const navigate = useNavigate();
 
     // Redirect if already authenticated
     useEffect(() => {
-        if (isAdminAuthenticated) {
+        if (currentAdmin) {
             navigate('/admin/dashboard');
         }
-    }, [isAdminAuthenticated, navigate]);
+    }, [currentAdmin, navigate]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setError('');
         setIsLoading(true);
 
-        // Simulate network delay
-        await new Promise(resolve => setTimeout(resolve, 500));
+        try {
+            // For now, use the existing login method with password only
+            // Use the new login method with email and password
+            const success = await login(email, password);
 
-        const success = login(password);
-
-        if (success) {
-            navigate('/admin/dashboard');
-        } else {
-            setError('Invalid admin password');
-            setPassword('');
+            if (success) {
+                navigate('/admin/dashboard');
+            } else {
+                setError('Invalid admin credentials');
+                setPassword('');
+            }
+        } catch (error) {
+            setError('Login failed. Please try again.');
+        } finally {
+            setIsLoading(false);
         }
-
-        setIsLoading(false);
     };
 
     return (
@@ -64,6 +68,27 @@ export const AdminLogin: React.FC = () => {
 
                     {/* Login Form */}
                     <form onSubmit={handleSubmit} className="space-y-6">
+                        <div>
+                            <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
+                                Admin Email
+                            </label>
+                            <div className="relative">
+                                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                    <Mail className="h-5 w-5 text-gray-400" />
+                                </div>
+                                <input
+                                    id="email"
+                                    type="email"
+                                    value={email}
+                                    onChange={(e) => setEmail(e.target.value)}
+                                    className="block w-full pl-10 pr-4 py-3 border border-gray-300 rounded-xl shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500 bg-white/70 backdrop-blur-sm"
+                                    placeholder="admin@isgconf.com"
+                                    required
+                                    disabled={isLoading}
+                                />
+                            </div>
+                        </div>
+
                         <div>
                             <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
                                 Admin Password

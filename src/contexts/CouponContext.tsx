@@ -1,205 +1,328 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { Participant, MealSlot, Coupon } from '../types';
+import { createContext, ReactNode, useContext, useEffect, useState } from "react";
+import { CouponContextType, CouponResultType, Participant } from "../types";
+import { supabase } from "../services/supabase";
 import {
-    getMealSlots,
-    getUserClaims,
-    updateCoupon
-} from '../services/storageService';
-
-interface CouponContextType {
-    // State
-    mealSlots: MealSlot[];
-    claims: Coupon[];
-    countdowns: { [key: string]: number };
-
-    // Actions
-    loadClaims: (participantId: string) => void;
-    claimMeal: (mealSlotId: string, familyMemberIndex?: number) => void;
-    claimFamilyMeal: (mealSlotId: string) => void;
-    expireClaim: (claimId: string) => void;
-
-    // Getters
-    getClaimForSlot: (mealSlotId: string, familyMemberIndex?: number) => Coupon | undefined;
-    getTimeRemaining: (mealSlotId: string) => number | undefined;
-}
+    getRemainingTime as gtR,
+    getCouponById,
+    checkAndExpireOutdatedCoupons,
+    saveCouponData,
+    claimCoupon,
+    verifyCouponTimestamps,
+    getCouponData
+} from "../services/storageService";
 
 const CouponContext = createContext<CouponContextType | undefined>(undefined);
 
-interface CouponProviderProps {
-    children: ReactNode;
-    participant: Participant | null;
-}
+type AuthProviderProps = { children: ReactNode, participant: Participant }
 
-
-/**
- * Claims a meal for a participant at a specific meal slot and family member index.
- * If a claim exists and is available, it will be updated to 'active' status with
- * an expiration time of 15 minutes from the current time.
- * 
- * @param mealSlotId - The ID of the meal slot to claim
- * @param familyMemberIndex - Optional index indicating which family member the claim is for (defaults to 0)
- * @returns void
- * 
- * @remarks
- * - Will return early if no participant is provided
- * - Only processes the claim if an available claim exists for the given mealSlotId and familyMemberIndex
- * - Sets claimedAt to current time and expiresAt to 15 minutes from current time
- * - Automatically reloads claims after updating
- */
-export const CouponProvider: React.FC<CouponProviderProps> = ({ children, participant }) => {
-    const [mealSlots] = useState<MealSlot[]>(getMealSlots());
-    const [claims, setClaims] = useState<Coupon[]>([]);
-    const [countdowns, setCountdowns] = useState<{ [key: string]: number }>({});
+export const CouponProvider = ({ children, participant }: AuthProviderProps) => {
+    const [isLoading, setIsLoading] = useState(false);
+    const [coupons, setCoupons] = useState<CouponResultType | null>(null);
 
     useEffect(() => {
-        if (participant) {
-            loadClaims(participant.id);
-        }
-    }, [participant?.id]);
+        (async () => {
+            // First, try to load coupons from localStorage for faster initial load
+            const localCoupons = getCouponData();
+            if (localCoupons.length > 0) {
+                // Filter coupons for this participant and check expiration
+                const participantCoupons = localCoupons.filter(c => c.id === participant.id);
+                checkAndExpireOutdatedCoupons(); // Update any expired coupons
 
-    useEffect(() => {
-        // Set up intervals for active claims
-        const intervals: { [key: string]: NodeJS.Timeout } = {};
-
-        claims.forEach(claim => {
-            if (claim.status === 'active' && claim.expiresAt) {
-                const expiryTime = new Date(claim.expiresAt).getTime();
-                const now = Date.now();
-                const timeRemaining = Math.max(0, Math.floor((expiryTime - now) / 1000));
-
-                if (timeRemaining > 0) {
-                    setCountdowns(prev => ({ ...prev, [claim.mealSlotId]: timeRemaining }));
-
-                    intervals[claim.id] = setInterval(() => {
-                        const currentTime = Date.now();
-                        const remaining = Math.max(0, Math.floor((expiryTime - currentTime) / 1000));
-
-                        if (remaining <= 0) {
-                            // Auto-expire the claim
-                            expireClaim(claim.id);
-                            clearInterval(intervals[claim.id]);
-                        } else {
-                            setCountdowns(prev => ({ ...prev, [claim.mealSlotId]: remaining }));
-                        }
-                    }, 1000);
+                if (participantCoupons.length > 0) {
+                    console.log("Loading coupons from localStorage:", participantCoupons);
+                    setCoupons(participantCoupons as CouponResultType);
                 }
             }
-        });
 
-        return () => {
-            Object.values(intervals).forEach(interval => clearInterval(interval));
-        };
-    }, [claims]);
+            // Then fetch fresh data from Supabase
+            const fetchedCoupons = await getCoupons();
+            setCoupons(fetchedCoupons);
+        })()
+    }, [participant.id]);
 
-    const loadClaims = (participantId: string): void => {
-        const userClaims = getUserClaims(participantId);
-        setClaims(userClaims);
-    };
+    const getCoupons = async () => {
+        try {
+            setIsLoading(true);
 
-    const expireClaim = (claimId: string): void => {
-        updateCoupon(claimId, {
-            status: 'used'
-        });
-
-        if (participant) {
-            loadClaims(participant.id);
-        }
-
-        // Clear countdown
-        const claim = claims.find(c => c.id === claimId);
-        if (claim) {
-            setCountdowns(prev => {
-                const newCountdowns = { ...prev };
-                delete newCountdowns[claim.mealSlotId];
-                return newCountdowns;
-            });
-        }
-    };
-
-    const claimMeal = (mealSlotId: string, familyMemberIndex: number = 0): void => {
-        if (!participant) return;
-
-        const claim = claims.find(c =>
-            c.mealSlotId === mealSlotId &&
-            c.familyMemberIndex === familyMemberIndex
-        );
-
-        if (claim && claim.status === 'available') {
-            const now = new Date();
-            const expiresAt = new Date(now.getTime() + 15 * 60 * 1000); // 15 minutes from now
-
-            updateCoupon(claim.id, {
-                status: 'active',
-                claimedAt: now.toISOString(),
-                expiresAt: expiresAt.toISOString()
-            });
-
-            loadClaims(participant.id);
-        }
-    };
-
-    const claimFamilyMeal = (mealSlotId: string): void => {
-        if (!participant || !participant.isFamily) return;
-
-        // Find all claims for this meal slot for all family members
-        const familyClaims = claims.filter(c => c.mealSlotId === mealSlotId);
-
-        // Claim for all family members
-        familyClaims.forEach(claim => {
-            if (claim.status === 'available') {
-                const now = new Date();
-                const expiresAt = new Date(now.getTime() + 15 * 60 * 1000); // 15 minutes from now
-
-                updateCoupon(claim.id, {
-                    status: 'active',
-                    claimedAt: now.toISOString(),
-                    expiresAt: expiresAt.toISOString()
-                });
+            const { data, error } = await supabase.from('coupons').select('*').eq('id', participant.id);
+            if (error) {
+                throw new Error('Error fetching coupons');
             }
-        });
 
-        loadClaims(participant.id);
-    };
+            // Get existing local coupons with timestamps
+            const localCoupons = getCouponData();
+            const localCouponsMap = new Map();
+            localCoupons.forEach(coupon => {
+                if (coupon.id === participant.id) {
+                    const key = `${coupon.mealSlotId}-${coupon.familyMemberIndex}`;
+                    localCouponsMap.set(key, coupon);
+                }
+            });
 
-    const getClaimForSlot = (mealSlotId: string, familyMemberIndex: number = 0): Coupon | undefined => {
-        return claims.find(c =>
-            c.mealSlotId === mealSlotId &&
-            c.familyMemberIndex === familyMemberIndex
-        );
-    };
+            // Process data before returning, prioritizing local timestamps if they exist
+            const processedData = data.map((coupon) => {
+                const key = `${coupon.mealSlotId}-${coupon.familyMemberIndex || 0}`;
+                const localCoupon = localCouponsMap.get(key);
 
-    const getTimeRemaining = (mealSlotId: string): number | undefined => {
-        return countdowns[mealSlotId];
-    };
+                // If we have local coupon with timestamps, use those
+                if (localCoupon && localCoupon.couponedAt && localCoupon.expiresAt) {
+                    const now = new Date();
+                    const expiresAt = new Date(localCoupon.expiresAt);
+                    const isStillValid = now < expiresAt;
 
-    const value: CouponContextType = {
-        // State
-        mealSlots,
-        claims,
-        countdowns,
+                    return {
+                        ...coupon,
+                        status: isStillValid ? 'active' : 'used',
+                        familyMemberIndex: coupon.familyMemberIndex || 0,
+                        uniqueId: `${coupon.id}-${coupon.mealSlotId}-${coupon.familyMemberIndex || 0}`,
+                        couponedAt: localCoupon.couponedAt,
+                        expiresAt: localCoupon.expiresAt
+                    };
+                }
 
-        // Actions
-        loadClaims,
-        claimMeal,
-        claimFamilyMeal,
-        expireClaim,
+                // Otherwise use Supabase data
+                // Supabase status: true = available, false = claimed (check timestamps for active vs used)
+                return {
+                    ...coupon,
+                    status: coupon?.status === true ? 'available' :
+                        (coupon.couponedAt && new Date(coupon.couponedAt) > new Date(Date.now() - 15 * 60 * 1000)) ?
+                            'active' : 'used',
+                    familyMemberIndex: coupon.familyMemberIndex || 0,
+                    uniqueId: `${coupon.id}-${coupon.mealSlotId}-${coupon.familyMemberIndex || 0}`
+                };
+            });
 
-        // Getters
-        getClaimForSlot,
-        getTimeRemaining
+            // Update our storage service with the processed data
+            saveCouponData(processedData);
+
+            // Also keep the old storage format for backward compatibility
+            localStorage.setItem('coupons', JSON.stringify(processedData));
+
+            return processedData;
+        } catch (error) {
+            console.error("Error fetching coupons:", error);
+            return [];
+        } finally {
+            setIsLoading(false);
+        }
+    }
+
+    const updateCoupon = async (mealSlotId: string, status: string, familyMemberIndex = 0) => {
+        try {
+            console.log("Updating coupon for mealSlotId:", mealSlotId);
+            console.log("New status:", status);
+            console.log("Family member index:", familyMemberIndex);
+
+            let claimedCoupon: any = null;
+            let existingTimestamps: { couponedAt: string | null, expiresAt: string | null } = { couponedAt: null, expiresAt: null };
+
+            // 1. Check for existing coupon with timestamps first
+            const existingCoupon = getCouponById(mealSlotId, participant.id, familyMemberIndex);
+            if (existingCoupon && existingCoupon.couponedAt && existingCoupon.expiresAt) {
+                existingTimestamps.couponedAt = existingCoupon.couponedAt;
+                existingTimestamps.expiresAt = existingCoupon.expiresAt;
+                console.log("Found existing coupon with timestamps:", existingTimestamps);
+            }
+
+            // 2. Update local storage with timestamps using our new functions
+            if (status === 'active') {
+                // Use our claimCoupon function which now has safety checks
+
+                claimedCoupon = claimCoupon(mealSlotId, participant.id, familyMemberIndex);
+                console.log("Claimed coupon with timestamps:", claimedCoupon);
+            }
+
+            // 3. Update local state for UI rendering using the actual stored timestamps
+            if (coupons) {
+                const updatedCoupons = coupons.map(coupon => {
+                    if (coupon.mealSlotId === mealSlotId && coupon.familyMemberIndex === familyMemberIndex) {
+                        // Use timestamps from claimedCoupon if available, otherwise preserve existing ones
+                        const finalTimestamps = claimedCoupon ? {
+                            couponedAt: claimedCoupon.couponedAt,
+                            expiresAt: claimedCoupon.expiresAt
+                        } : existingTimestamps;
+
+                        const updatedCoupon = {
+                            ...coupon,
+                            status: status === 'available' ? 'available' as const : (status === 'active' ? 'active' as const : 'used' as const),
+                            couponedAt: status === 'active' ? (finalTimestamps.couponedAt || coupon.couponedAt) : coupon.couponedAt,
+                            expiresAt: status === 'active' ? (finalTimestamps.expiresAt || coupon.expiresAt) : coupon.expiresAt
+                        };
+
+                        console.log("Updated coupon in context state:", updatedCoupon);
+                        return updatedCoupon;
+                    }
+                    return coupon;
+                });
+
+                console.log("Setting updated coupons in context:", updatedCoupons);
+                setCoupons(updatedCoupons as CouponResultType);
+            }
+
+            // 4. Update in Supabase database using the actual stored timestamps
+            // Supabase status logic:
+            // - true = meal is available (not claimed)
+            // - false = meal is claimed/used (not available)
+            const timestampsForSupabase = claimedCoupon ? {
+                couponedAt: claimedCoupon.couponedAt,
+                expiresAt: claimedCoupon.expiresAt
+            } : existingTimestamps;
+
+            const { error } = await supabase
+                .from('coupons')
+                .update({
+                    status: status === 'active' ? false : true, // When claimed (active), status should be false in Supabase
+                    couponedAt: status === 'active' ? timestampsForSupabase.couponedAt : null,
+                    expiresAt: status === 'active' ? timestampsForSupabase.expiresAt : null
+                })
+                .eq('id', participant.id)
+                .eq('mealSlotId', mealSlotId)
+
+            console.log(`Updated Supabase for mealSlotId ${mealSlotId}: status=${status === 'active' ? false : true}, couponedAt=${status === 'active' ? timestampsForSupabase.couponedAt : null}`);
+
+            if (error) {
+                throw new Error(`Failed to update coupon: ${error.message}`);
+            }
+
+            // 5. Force a refresh of the coupon data to ensure UI is updated
+            const refreshedLocalCoupons = getCouponData();
+            const participantCoupons = refreshedLocalCoupons.filter(c => c.id === participant.id);
+            if (participantCoupons.length > 0) {
+                setCoupons(participantCoupons as CouponResultType);
+            }
+
+            return true;
+        } catch (error) {
+            console.error("Error updating coupon:", error);
+
+            // 4. Revert optimistic update if API call failed
+            const freshCoupons = await getCoupons();
+            setCoupons(freshCoupons);
+
+            return false;
+        }
+    }
+
+    const getClaimForSlot = (mealSlotId: string, familyMemberIndex = 0) => {
+        try {
+            // First check in the context state for the most up-to-date coupon
+            if (coupons) {
+                const contextCoupon = coupons.find(coupon =>
+                    coupon.mealSlotId === mealSlotId &&
+                    coupon.familyMemberIndex === familyMemberIndex
+                );
+
+                if (contextCoupon) {
+                    console.log("Found coupon in context:", contextCoupon);
+                    return contextCoupon;
+                }
+            }
+
+            // Then check in the storage service for the most up-to-date coupon
+            const storedCoupon = getCouponById(mealSlotId, participant.id, familyMemberIndex);
+
+            if (storedCoupon) {
+                // Check if the coupon has expired and update accordingly
+                checkAndExpireOutdatedCoupons();
+                // Get the refreshed coupon after expiry check
+                const refreshedCoupon = getCouponById(mealSlotId, participant.id, familyMemberIndex);
+
+                // Log coupon verification info for debugging
+                const verification = verifyCouponTimestamps(mealSlotId, participant.id, familyMemberIndex);
+                console.log("Coupon verification:", verification);
+
+                return refreshedCoupon;
+            }
+
+            // Fallback to using the context state
+            if (!coupons) return undefined;
+            const contextCoupon = coupons?.find(coupon => coupon.mealSlotId === mealSlotId);
+
+            // If we have a context coupon with timestamps, make sure it's also stored locally
+            if (contextCoupon && contextCoupon.couponedAt && contextCoupon.expiresAt) {
+                const storedCoupons = getCouponData();
+                const existsInStorage = storedCoupons.find((c: any) =>
+                    c.mealSlotId === mealSlotId &&
+                    c.id === participant.id &&
+                    c.familyMemberIndex === familyMemberIndex
+                );
+
+                if (!existsInStorage) {
+                    // Store the context coupon in localStorage for persistence
+                    storedCoupons.push(contextCoupon);
+                    saveCouponData(storedCoupons);
+                    console.log("Synchronized context coupon to localStorage:", contextCoupon);
+                }
+            }
+
+            return contextCoupon;
+        }
+        catch (error) {
+            console.error("Error getting claim for slot:", error);
+            return undefined;
+        }
+    }
+
+    const getRemainingTime = (couponId: string, familyMemberIndex = 0): number | undefined => {
+        // First check in the storage service for the most up-to-date expiration time
+        try {
+
+            const remainingTime = gtR(couponId, participant.id, familyMemberIndex);
+            if (remainingTime > 0) {
+                return remainingTime * 1000; // Convert seconds to milliseconds
+            }
+        } catch (error) {
+            console.error("Error getting remaining time from storage:", error);
+        }
+
+        // Fallback to using the context state
+        const coupon = coupons?.find(c => c.mealSlotId === couponId);
+        if (coupon && coupon.expiresAt) {
+            const expiresAt = new Date(coupon.expiresAt).getTime();
+            const now = Date.now();
+            const diff = expiresAt - now;
+            return diff > 0 ? diff : 0;
+        }
+        return undefined;
+    }
+
+
+    const refreshCoupons = async () => {
+        // Check for expired coupons first
+        checkAndExpireOutdatedCoupons();
+
+        // Get updated coupons from localStorage
+        const localCoupons = getCouponData();
+        const participantCoupons = localCoupons.filter(c => c.id === participant.id);
+
+        if (participantCoupons.length > 0) {
+            setCoupons(participantCoupons as CouponResultType);
+        }
+
+        // Also fetch from Supabase to ensure sync
+        const freshCoupons = await getCoupons();
+        setCoupons(freshCoupons);
     };
 
     return (
-        <CouponContext.Provider value={value}>
+        <CouponContext.Provider value={{
+            coupons,
+            isLoading,
+            updateCoupon,
+            getRemainingTime,
+            getCoupons,
+            getClaimForSlot,
+            refreshCoupons
+        }}>
             {children}
         </CouponContext.Provider>
     );
-};
+}
 
-export const useCoupon = (): CouponContextType => {
+export const useCoupon = () => {
     const context = useContext(CouponContext);
-    if (context === undefined) {
-        throw new Error('useCoupon must be used within a CouponProvider');
+    if (!context) {
+        throw new Error("useCoupon must be used within a CouponProvider");
     }
     return context;
-};
+}

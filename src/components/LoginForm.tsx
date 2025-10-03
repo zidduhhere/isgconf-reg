@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Smartphone, ArrowRight, Stethoscope, Shield, Users, Award } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { EventDetails, FeatureGrid } from './ui';
 
 export const LoginForm: React.FC = () => {
   const { login, loginError, isLoading, currentUser } = useAuth();
@@ -15,10 +16,10 @@ export const LoginForm: React.FC = () => {
     }
   }, [currentUser, navigate]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (phoneNumber.trim()) {
-      login(phoneNumber.trim());
+      await login(phoneNumber.trim());
     }
   };
 
@@ -72,67 +73,43 @@ export const LoginForm: React.FC = () => {
             </p>
 
             {/* Feature Cards - Desktop Only */}
-            <div className="grid grid-cols-2 gap-3 mb-6">
-              <div className="bg-white/60 backdrop-blur-sm rounded-lg p-3 border border-white/20 animate-scale-in">
-                <div className="flex items-center gap-2">
-                  <Stethoscope className="w-6 h-6 text-primary-600" />
-                  <div className="text-left">
-                    <h4 className="font-medium text-neutral-900 text-sm">Medical Sessions</h4>
-                    <p className="text-xs text-neutral-600">Expert-led workshops</p>
-                  </div>
-                </div>
-              </div>
-              <div className="bg-white/60 backdrop-blur-sm rounded-lg p-3 border border-white/20 animate-scale-in" style={{ animationDelay: '0.1s' }}>
-                <div className="flex items-center gap-2">
-                  <Users className="w-6 h-6 text-primary-600" />
-                  <div className="text-left">
-                    <h4 className="font-medium text-neutral-900 text-sm">Networking</h4>
-                    <p className="text-xs text-neutral-600">Connect with peers</p>
-                  </div>
-                </div>
-              </div>
-              <div className="bg-white/60 backdrop-blur-sm rounded-lg p-3 border border-white/20 animate-scale-in" style={{ animationDelay: '0.2s' }}>
-                <div className="flex items-center gap-2">
-                  <Award className="w-6 h-6 text-primary-600" />
-                  <div className="text-left">
-                    <h4 className="font-medium text-neutral-900 text-sm">CME Credits</h4>
-                    <p className="text-xs text-neutral-600">Earn certifications</p>
-                  </div>
-                </div>
-              </div>
-              <div className="bg-white/60 backdrop-blur-sm rounded-lg p-3 border border-white/20 animate-scale-in" style={{ animationDelay: '0.3s' }}>
-                <div className="flex items-center gap-2">
-                  <Shield className="w-6 h-6 text-primary-600" />
-                  <div className="text-left">
-                    <h4 className="font-medium text-neutral-900 text-sm">Secure Access</h4>
-                    <p className="text-xs text-neutral-600">Protected portal</p>
-                  </div>
-                </div>
-              </div>
-            </div>
+            <FeatureGrid
+              className="mb-6"
+              features={[
+                {
+                  icon: <Stethoscope />,
+                  title: "Medical Sessions",
+                  description: "Expert-led workshops"
+                },
+                {
+                  icon: <Users />,
+                  title: "Networking",
+                  description: "Connect with peers"
+                },
+                {
+                  icon: <Award />,
+                  title: "CME Credits",
+                  description: "Earn certifications"
+                },
+                {
+                  icon: <Shield />,
+                  title: "Secure Access",
+                  description: "Protected portal"
+                }
+              ]}
+            />
 
             {/* Event Details - Desktop Only */}
-            <div className="bg-gradient-to-r from-primary-600 to-primary-700 rounded-xl p-4 text-white animate-slide-up">
-              <h3 className="text-base font-semibold mb-2">Conference Details</h3>
-              <div className="grid grid-cols-2 gap-3 text-xs">
-                <div>
-                  <p className="text-primary-200">Date</p>
-                  <p className="font-medium">October 4-5, 2025</p>
-                </div>
-                <div>
-                  <p className="text-primary-200">Venue</p>
-                  <p className="font-medium">Hayatt Residency Hotel</p>
-                </div>
-                <div>
-                  <p className="text-primary-200">Location</p>
-                  <p className="font-medium">Thiruvananthapuram</p>
-                </div>
-                <div>
-                  <p className="text-primary-200">Duration</p>
-                  <p className="font-medium">2 Days</p>
-                </div>
-              </div>
-            </div>
+            <EventDetails
+              title="Conference Details"
+              details={[
+                { label: "Date", value: "October 4-5, 2025" },
+                { label: "Venue", value: "Hayatt Residency Hotel" },
+                { label: "Location", value: "Thiruvananthapuram" },
+                { label: "Duration", value: "2 Days" }
+              ]}
+              className="animate-slide-up"
+            />
           </div>
 
           {/* Mobile & Desktop Login Form */}
@@ -233,11 +210,28 @@ export const LoginForm: React.FC = () => {
 
             {/* Mobile Event Info */}
             <div className="mt-4 lg:hidden">
-              <div className="bg-gradient-to-r from-primary-600 to-primary-700 rounded-lg p-3 text-white text-center">
-                <h4 className="text-sm font-semibold mb-1">ISGCON 2025</h4>
-                <p className="text-xs text-primary-200">October 4-5 • Thiruvananthapuram</p>
-              </div>
+              <EventDetails
+                title="ISGCON 2025"
+                details={[
+                  { label: "", value: "October 4-5 • Thiruvananthapuram" }
+                ]}
+                columns={1}
+                className="p-3 rounded-lg text-center"
+              />
             </div>
+
+            {/* Developer Mode Link - only visible in development */}
+            {process.env.NODE_ENV !== 'production' && (
+              <div className="mt-6 pt-4 border-t border-gray-200 text-center">
+                <p className="text-xs text-gray-500">Developer Mode</p>
+                <a
+                  href="/ui-components"
+                  className="inline-flex items-center text-xs text-primary-600 hover:text-primary-800"
+                >
+                  View Component Library
+                </a>
+              </div>
+            )}
           </div>
         </div>
       </div>

@@ -3,7 +3,10 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { LoginForm } from './components/LoginForm';
 import { Dashboard } from './components/Dashboard';
 import { AdminLogin } from './components/AdminLogin';
-import { AdminDashboard } from './components/AdminDashboard';
+import { AdminDashboardNew } from './components/AdminDashboardNew';
+import ComponentLibrary from './components/ComponentLibrary';
+import ExhibitorApp from './components/ExhibitorApp';
+import Navigation from './components/Navigation';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { CouponProvider } from './contexts/CouponContext';
 import { AdminProvider, useAdmin } from './contexts/AdminContext';
@@ -16,8 +19,8 @@ const ProtectedUserRoute: React.FC<{ children: React.ReactNode }> = ({ children 
 
 // Protected route for admin dashboard
 const ProtectedAdminRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { isAdminAuthenticated } = useAdmin();
-  return isAdminAuthenticated ? <>{children}</> : <Navigate to="/admin/login" />;
+  const { currentAdmin } = useAdmin();
+  return currentAdmin ? <>{children}</> : <Navigate to="/admin/login" />;
 };
 
 // User Dashboard Wrapper with CouponProvider
@@ -46,30 +49,52 @@ const LoadingScreen: React.FC = () => (
 );
 
 const AppContent: React.FC = () => {
-  const { isInitializing } = useAuth();
+  const { isLoading } = useAuth();
 
-  if (isInitializing) {
+  if (isLoading) {
     return <LoadingScreen />;
   }
 
   return (
     <Routes>
       {/* User Routes */}
-      <Route path="/" element={<LoginForm />} />
-      <Route path="/login" element={<LoginForm />} />
+      <Route path="/" element={
+        <>
+          <Navigation />
+          <LoginForm />
+        </>
+      } />
+      <Route path="/login" element={
+        <>
+          <Navigation />
+          <LoginForm />
+        </>
+      } />
       <Route path="/dashboard" element={
         <ProtectedUserRoute>
           <UserDashboardWrapper />
         </ProtectedUserRoute>
       } />
 
+      {/* Exhibitor Routes */}
+      <Route path="/exhibitor" element={<ExhibitorApp />} />
+      <Route path="/exhibitor/*" element={<ExhibitorApp />} />
+
       {/* Admin Routes */}
-      <Route path="/admin/login" element={<AdminLogin />} />
+      <Route path="/admin/login" element={
+        <>
+          <Navigation />
+          <AdminLogin />
+        </>
+      } />
       <Route path="/admin/dashboard" element={
         <ProtectedAdminRoute>
-          <AdminDashboard />
+          <AdminDashboardNew />
         </ProtectedAdminRoute>
       } />
+
+      {/* Component Library - Development Only */}
+      <Route path="/ui-components" element={<ComponentLibrary />} />
 
       {/* Fallback */}
       <Route path="*" element={<Navigate to="/" />} />

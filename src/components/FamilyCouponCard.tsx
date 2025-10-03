@@ -1,19 +1,19 @@
 import React, { useEffect, useState } from 'react';
-import { Clock, CheckCircle, XCircle, Star, X, Check, Users } from 'lucide-react';
+import { Clock, CheckCircle, XCircle, Star, X, Check, Users, Lock, Timer, CalendarClock } from 'lucide-react';
 import { MealSlot, Coupon, Participant } from '../types';
-import { formatTimeRemaining } from '../utils/timeUtils';
+import { formatTimeRemaining, getMealTimeStatus } from '../utils/timeUtils';
 
 interface FamilyCouponCardProps {
     mealSlot: MealSlot;
-    claim: Coupon;
-    onClaim: (mealSlotId: string, isFamily: boolean) => void;
+    coupon: Coupon;
+    onClaim: (mealSlotId: string) => void;
     timeRemaining?: number;
     participant: Participant;
 }
 
 export const FamilyCouponCard: React.FC<FamilyCouponCardProps> = ({
     mealSlot,
-    claim,
+    coupon,
     onClaim,
     timeRemaining,
     participant
@@ -26,7 +26,7 @@ export const FamilyCouponCard: React.FC<FamilyCouponCardProps> = ({
     }, [timeRemaining]);
 
     useEffect(() => {
-        if (claim.status === 'active' && localTimeRemaining > 0) {
+        if (coupon.status === 'active' && localTimeRemaining > 0) {
             const interval = setInterval(() => {
                 setLocalTimeRemaining((prev) => {
                     if (prev <= 1) {
@@ -39,10 +39,21 @@ export const FamilyCouponCard: React.FC<FamilyCouponCardProps> = ({
 
             return () => clearInterval(interval);
         }
-    }, [claim.status, localTimeRemaining]);
+    }, [coupon.status, localTimeRemaining]);
 
     const getCardState = () => {
-        return claim.status;
+        // Check the meal time status
+        const timeStatus = getMealTimeStatus(mealSlot);
+
+        // If the meal is in the past or upcoming (not active), it should be locked
+        if (timeStatus === 'past') {
+            return 'locked-past';
+        } else if (timeStatus === 'upcoming') {
+            return 'locked-upcoming';
+        }
+
+        // If the meal is active, return the actual coupon status
+        return coupon.status;
     };
 
     const getCardStyles = () => {
@@ -55,6 +66,12 @@ export const FamilyCouponCard: React.FC<FamilyCouponCardProps> = ({
             case 'active':
                 return `${baseStyles} bg-gradient-to-br from-green-400 via-green-500 to-green-600 shadow-green-300 animate-pulse`;
             case 'used':
+                return `${baseStyles} bg-gradient-to-br from-gray-400 via-gray-500 to-gray-600`;
+            case 'locked-upcoming':
+                return `${baseStyles} bg-gradient-to-br from-amber-400 via-amber-500 to-amber-600`;
+            case 'locked-past':
+                return `${baseStyles} bg-gradient-to-br from-gray-400 via-gray-500 to-gray-600 opacity-80`;
+            case 'locked':
                 return `${baseStyles} bg-gradient-to-br from-gray-400 via-gray-500 to-gray-600`;
             default:
                 return baseStyles;
@@ -72,6 +89,12 @@ export const FamilyCouponCard: React.FC<FamilyCouponCardProps> = ({
                 return <CheckCircle className={`${iconSize} text-white drop-shadow-lg`} />;
             case 'used':
                 return <XCircle className={`${iconSize} text-white drop-shadow-lg`} />;
+            case 'locked-upcoming':
+                return <Timer className={`${iconSize} text-white drop-shadow-lg`} />;
+            case 'locked-past':
+                return <CalendarClock className={`${iconSize} text-white drop-shadow-lg`} />;
+            case 'locked':
+                return <Lock className={`${iconSize} text-white drop-shadow-lg`} />;
             default:
                 return <Clock className={`${iconSize} text-white drop-shadow-lg`} />;
         }
@@ -87,13 +110,36 @@ export const FamilyCouponCard: React.FC<FamilyCouponCardProps> = ({
                 return `VALID - ${formatTimeRemaining(localTimeRemaining)}`;
             case 'used':
                 return 'ALREADY USED';
+            case 'locked-upcoming':
+                return `Available at ${mealSlot.startTime}`;
+            case 'locked-past':
+                return 'Time Expired';
+            case 'locked':
+                return 'Not Available';
             default:
                 return 'Unknown Status';
         }
     };
 
     const getStatusTextColor = () => {
-        return 'text-white drop-shadow-lg';
+        const state = getCardState();
+
+        switch (state) {
+            case 'available':
+                return 'text-white drop-shadow-lg';
+            case 'active':
+                return 'text-white font-bold drop-shadow-lg';
+            case 'used':
+                return 'text-white font-bold drop-shadow-lg';
+            case 'locked-upcoming':
+                return 'text-white font-bold drop-shadow-lg';
+            case 'locked-past':
+                return 'text-white font-bold drop-shadow-lg';
+            case 'locked':
+                return 'text-white font-bold drop-shadow-lg';
+            default:
+                return 'text-white drop-shadow-lg';
+        }
     };
 
     const handleClick = () => {
@@ -104,7 +150,7 @@ export const FamilyCouponCard: React.FC<FamilyCouponCardProps> = ({
     };
 
     const handleConfirmClaim = () => {
-        onClaim(mealSlot.id, true);
+        onClaim(mealSlot.id);
         setShowConfirmation(false);
     };
 
@@ -159,6 +205,9 @@ export const FamilyCouponCard: React.FC<FamilyCouponCardProps> = ({
                             <p className="text-xs text-white opacity-80 mt-1 drop-shadow">
                                 For {participant.familySize} people
                             </p>
+                            <p className="text-xs text-white opacity-80 mt-1 drop-shadow">
+                                {mealSlot.startTime} - {mealSlot.endTime}
+                            </p>
                         </div>
                         <div className="bg-white bg-opacity-20 rounded-full p-2">
                             {getIcon()}
@@ -172,7 +221,7 @@ export const FamilyCouponCard: React.FC<FamilyCouponCardProps> = ({
                             </p>
                         </div>
 
-                        {claim.status === 'active' && localTimeRemaining > 0 && (
+                        {coupon.status === 'active' && localTimeRemaining > 0 && (
                             <div className="w-full">
                                 <div className="w-full bg-white bg-opacity-30 rounded-full h-3 mb-1">
                                     <div
@@ -210,7 +259,7 @@ export const FamilyCouponCard: React.FC<FamilyCouponCardProps> = ({
                                 <h4 className="font-semibold text-gray-900 mb-1">{mealSlot.name}</h4>
                                 <p className="text-sm text-gray-600">ISGCON 2025 • Family Coupon</p>
                                 <p className="text-sm text-purple-600 font-medium">Valid for {participant.familySize} people</p>
-                                <p className="text-sm text-gray-600">Valid for 15 minutes once claimed</p>
+                                <p className="text-sm text-gray-600">Valid for 15 minutes once couponed</p>
                             </div>
 
                             {/* Family Requirements */}
@@ -225,7 +274,7 @@ export const FamilyCouponCard: React.FC<FamilyCouponCardProps> = ({
 
                             {/* Warning */}
                             <p className="text-sm text-gray-600 mb-6">
-                                Please confirm that all family members are present before claiming this coupon.
+                                Please confirm that all family members are present before couponing this coupon.
                             </p>
 
                             {/* Action Buttons */}

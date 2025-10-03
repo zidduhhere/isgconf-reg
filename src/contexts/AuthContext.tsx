@@ -1,19 +1,14 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { Participant } from '../types';
-import {
-    initializeData,
-    authenticateParticipant,
-    getCurrentUser,
-    setCurrentUser as setStorageCurrentUser,
-    clearCurrentUser
-} from '../services/storageService';
+
+import { getParticipantDetails, supabase } from '../services/supabase';
 
 interface AuthContextType {
     // State
     currentUser: Participant | null;
     loginError: string | null;
     isLoading: boolean;
-    isInitializing: boolean;
+
 
     // Actions
     login: (phoneNumber: string) => Promise<void>;
@@ -27,47 +22,70 @@ interface AuthProviderProps {
     children: ReactNode;
 }
 
-export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
+export const AuthProvider = ({ children }: AuthProviderProps) => {
     const [currentUser, setCurrentUserState] = useState<Participant | null>(null);
     const [loginError, setLoginError] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(false);
-    const [isInitializing, setIsInitializing] = useState(true);
+
 
     useEffect(() => {
-        // Initialize data and check for existing user session
-        initializeData();
-        const existingUser = getCurrentUser();
-        if (existingUser) {
-            setCurrentUserState(existingUser);
-        }
-        setIsInitializing(false);
-    }, []);
+        const initializeAuth = async () => {
+            try {
+                if (currentUser) return; // If we already have a user, skip
+
+                const session = await supabase.auth.getSession();
+                if (session.data.session) {
+                    const participant = await getParticipantDetails(session.data.session.user.id);
+                    if (participant) {
+                        setCurrentUserState(participant);
+                    } else {
+                        console.log("No participant found for user ID:", session.data.session.user.id);
+                        // Optionally sign out if no participant found
+                        await supabase.auth.signOut();
+                    }
+                }
+            } catch (error) {
+                console.error("Error fetching session on mount:", error);
+            }
+        };
+
+        initializeAuth();
+    }, [currentUser]);
+
 
     const login = async (phoneNumber: string): Promise<void> => {
         setIsLoading(true);
         setLoginError(null);
 
         try {
-            // Simulate network delay for better UX
-            await new Promise(resolve => setTimeout(resolve, 1000));
+            const { data } = await supabase.auth.signInWithPassword({
+                email: `${phoneNumber}@isgcon.com`,
+                password: '123456789'
+            })
 
-            const participant = authenticateParticipant(phoneNumber);
+
+            if (!data.session) {
+                setLoginError('Invalid phone number. Please check your number or contact event support.');
+                return;
+            }
+            //Get participant details fromt the supabase table
+            const participant = await getParticipantDetails(data.user.id);
 
             if (participant) {
-                setStorageCurrentUser(participant);
                 setCurrentUserState(participant);
             } else {
                 setLoginError('Phone number not found. Please check your number or contact event support.');
             }
         } catch (error) {
             setLoginError('An error occurred during login. Please try again.');
+            console.error('Login error:', error);
         } finally {
             setIsLoading(false);
         }
     };
 
-    const logout = (): void => {
-        clearCurrentUser();
+    const logout = async (): Promise<void> => {
+        await supabase.auth.signOut();
         setCurrentUserState(null);
         setLoginError(null);
     };
@@ -80,8 +98,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         // State
         currentUser,
         loginError,
-        isLoading,
-        isInitializing,
+        isLoading,        // Placeholder for potential future use
 
         // Actions
         login,

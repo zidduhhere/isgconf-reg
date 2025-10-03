@@ -1,24 +1,41 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { LogOut, User, Utensils, Users } from 'lucide-react';
+import { LogOut, User, Utensils, Users, ImageIcon, UserSquare2, Building } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
+import { ImagePlaceholder, Instructions } from './ui';
 import { MealCard } from './MealCard';
 import { FamilyCouponCard } from './FamilyCouponCard';
-import { useAuth } from '../contexts/AuthContext';
+import { MEAL_SLOTS as mealSlots } from '../data/mockData';
 import { useCoupon } from '../contexts/CouponContext';
+
 
 export const Dashboard: React.FC = () => {
   const { currentUser, logout } = useAuth();
-  const { mealSlots, getClaimForSlot, getTimeRemaining, claimMeal, claimFamilyMeal } = useCoupon();
   const navigate = useNavigate();
+  const { coupons, getRemainingTime, isLoading, getClaimForSlot, updateCoupon } = useCoupon();
 
   if (!currentUser) {
     return null; // This shouldn't happen, but just in case
+
   }
 
   const handleLogout = () => {
     logout();
     navigate('/login');
-  }; return (
+  };
+
+  if (isLoading || !coupons) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading meal coupons...</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
     <div className="min-h-screen relative overflow-hidden">
       {/* Animated Background with Blur Gradients */}
       <div className="absolute inset-0 ">
@@ -62,34 +79,38 @@ export const Dashboard: React.FC = () => {
               <Utensils className="w-8 h-8 text-blue-600" />
             </div>
             <h1 className="text-2xl font-bold text-gray-900 mb-1">Your Meal Pass</h1>
-            <p className="text-gray-600">Tap a card to claim your meal</p>
+            <p className="text-gray-600">Tap a card to coupon your meal</p>
           </div>
+
+
 
           {/* Meal Cards Grid */}
           <div className="grid grid-cols-1 gap-4 ">
             {mealSlots.map((slot) => {
-              const claim = getClaimForSlot(slot.id, 0);
-              const timeRemaining = getTimeRemaining(slot.id);
-
+              const coupon = getClaimForSlot(slot.id);
+              if (!coupon) {
+                console.warn(`No coupon found for mealSlotId: ${slot.id}`);
+                return null;
+              }
               return (
                 <MealCard
                   key={slot.id}
                   mealSlot={slot}
-                  claim={claim || {
-                    id: '',
-                    participantId: currentUser.id,
-                    mealSlotId: slot.id,
-                    familyMemberIndex: 0,
-                    status: 'available'
+                  coupon={coupon}
+                  onClaim={async () => {
+                    try {
+                      console.log(`Claiming coupon for meal slot: ${slot.id}`);
+                      await updateCoupon(slot.id, 'active', 0);
+                      console.log(`Successfully claimed coupon for meal slot: ${slot.id}`);
+                    } catch (error) {
+                      console.error(`Error claiming meal for slot ${slot.id}:`, error);
+                    }
                   }}
-                  onClaim={claimMeal}
-                  timeRemaining={timeRemaining}
-                  familyMemberIndex={0}
-                  familyMemberName={currentUser.name}
                 />
               );
             })}
           </div>
+
 
           {/* Family Coupons Section - Only show if participant has family */}
           {currentUser.isFamily && (
@@ -99,30 +120,46 @@ export const Dashboard: React.FC = () => {
                   <Users className="w-8 h-8 text-purple-600" />
                 </div>
                 <h2 className="text-xl font-bold text-gray-900 mb-1">Family Coupons</h2>
-                <p className="text-gray-600">For you and your family members</p>
+                <p className="text-gray-600">Meal coupons for your family members</p>
+                <p className="text-sm text-gray-500 mt-1">Family size: {currentUser.familySize || 1} members</p>
               </div>
 
               {/* Family Meal Cards Grid */}
-              <div className="grid grid-cols-1 gap-4">
-                {mealSlots.map((slot) => {
-                  const familyClaim = getClaimForSlot(slot.id, 0);
-                  const familyTimeRemaining = getTimeRemaining(`family-${slot.id}`);
+              <div className="space-y-6">
+                {Array.from({ length: (currentUser.familySize || 1) - 1 }, (_, familyIndex) => {
+                  const familyMemberIndex = familyIndex + 1; // Start from 1 (0 is the main participant)
 
                   return (
-                    <FamilyCouponCard
-                      key={`family-${slot.id}`}
-                      mealSlot={slot}
-                      claim={familyClaim || {
-                        id: `family-${slot.id}`,
-                        participantId: currentUser.id,
-                        mealSlotId: slot.id,
-                        familyMemberIndex: 0,
-                        status: 'available'
-                      }}
-                      onClaim={claimFamilyMeal}
-                      timeRemaining={familyTimeRemaining}
-                      participant={currentUser}
-                    />
+                    <div key={`family-member-${familyMemberIndex}`} className="space-y-4">
+                      <h3 className="text-lg font-semibold text-gray-800 text-center">
+                        Family Member {familyMemberIndex}
+                      </h3>
+                      <div className="grid grid-cols-1 gap-4">
+                        {mealSlots.map((slot) => {
+                          const familyCoupon = getClaimForSlot(slot.id, familyMemberIndex);
+                          const familyTimeRemaining = getRemainingTime(`${slot.id}-family-${familyMemberIndex}`, familyMemberIndex);
+
+                          return (
+                            <FamilyCouponCard
+                              key={`family-${familyMemberIndex}-${slot.id}`}
+                              mealSlot={slot}
+                              coupon={familyCoupon || {
+                                id: `family-${familyMemberIndex}-${slot.id}`,
+                                uniqueId: `family-${familyMemberIndex}-${slot.id}-${currentUser.id}`,
+                                mealSlotId: slot.id,
+                                familyMemberIndex: familyMemberIndex,
+                                status: 'available'
+                              }}
+                              onClaim={(mealSlotId) => {
+                                updateCoupon(mealSlotId, 'active', familyMemberIndex);
+                              }}
+                              timeRemaining={familyTimeRemaining}
+                              participant={currentUser}
+                            />
+                          );
+                        })}
+                      </div>
+                    </div>
                   );
                 })}
               </div>
@@ -134,63 +171,89 @@ export const Dashboard: React.FC = () => {
             <h3 className="text-lg font-semibold text-gray-900 mb-4 text-center">Event Gallery</h3>
             <div className="grid grid-cols-1 gap-4">
               {/* Image Placeholder 1 */}
-              <div className="bg-gradient-to-br from-blue-100 to-blue-200 rounded-xl h-48 flex items-center justify-center border-2 border-dashed border-blue-300">
-                <div className="text-center">
-                  <div className="w-16 h-16 bg-blue-300 rounded-full flex items-center justify-center mx-auto mb-3">
-                    <svg className="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                    </svg>
-                  </div>
-                  <p className="text-blue-700 font-medium">Conference Highlights</p>
-                  <p className="text-blue-600 text-sm mt-1">Photos coming soon...</p>
-                </div>
-              </div>
+              <ImagePlaceholder
+                gradientFrom="from-blue-100"
+                gradientTo="to-blue-200"
+                borderColor="border-blue-300"
+                iconBgColor="bg-blue-300"
+                iconColor="text-blue-600"
+                title="Conference Highlights"
+                subtitle="Photos coming soon..."
+                icon={<ImageIcon />}
+              />
 
               {/* Image Placeholder 2 */}
-              <div className="bg-gradient-to-br from-purple-100 to-purple-200 rounded-xl h-48 flex items-center justify-center border-2 border-dashed border-purple-300">
-                <div className="text-center">
-                  <div className="w-16 h-16 bg-purple-300 rounded-full flex items-center justify-center mx-auto mb-3">
-                    <svg className="w-8 h-8 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-                    </svg>
-                  </div>
-                  <p className="text-purple-700 font-medium">Speaker Sessions</p>
-                  <p className="text-purple-600 text-sm mt-1">Expert presentations</p>
-                </div>
-              </div>
+              <ImagePlaceholder
+                gradientFrom="from-purple-100"
+                gradientTo="to-purple-200"
+                borderColor="border-purple-300"
+                iconBgColor="bg-purple-300"
+                iconColor="text-purple-600"
+                title="Speaker Sessions"
+                subtitle="Expert presentations"
+                titleColor="text-purple-700"
+                subtitleColor="text-purple-600"
+                icon={<UserSquare2 />}
+              />
 
               {/* Image Placeholder 3 */}
-              <div className="bg-gradient-to-br from-orange-100 to-orange-200 rounded-xl h-48 flex items-center justify-center border-2 border-dashed border-orange-300">
-                <div className="text-center">
-                  <div className="w-16 h-16 bg-orange-300 rounded-full flex items-center justify-center mx-auto mb-3">
-                    <svg className="w-8 h-8 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                    </svg>
-                  </div>
-                  <p className="text-orange-700 font-medium">Venue & Facilities</p>
-                  <p className="text-orange-600 text-sm mt-1">Hayatt Residency Hotel</p>
-                </div>
-              </div>
+              <ImagePlaceholder
+                gradientFrom="from-orange-100"
+                gradientTo="to-orange-200"
+                borderColor="border-orange-300"
+                iconBgColor="bg-orange-300"
+                iconColor="text-orange-600"
+                title="Venue & Facilities"
+                subtitle="Hayatt Residency Hotel"
+                titleColor="text-orange-700"
+                subtitleColor="text-orange-600"
+                icon={<Building />}
+              />
             </div>
           </div>
 
           {/* Instructions */}
-          <div className="mt-8 bg-white/80 backdrop-blur-lg rounded-xl p-4 shadow-sm border border-white/20">
-            <h3 className="font-semibold text-gray-900 mb-2">How it works:</h3>
-            <ul className="text-sm text-gray-600 space-y-1">
-              <li>• All meal cards are available anytime</li>
-              <li>• Tap to claim your meal voucher</li>
-              <li>• Show the GREEN card to food servers</li>
-              <li>• Each meal can only be claimed once</li>
-              <li>• Claims expire after 15 minutes</li>
-              {currentUser.isFamily && (
-                <>
-                  <li className="text-purple-600 font-medium">• Family coupons are for all family members together</li>
-                  <li className="text-purple-600">• Ensure all family members are present when claiming</li>
-                </>
-              )}
-            </ul>
+          <div className="mt-8">
+            <Instructions
+              title="How it works:"
+              items={[
+                { text: "All meal cards are available anytime" },
+                { text: "Tap to coupon your meal voucher" },
+                { text: "Show the GREEN card to food servers" },
+                { text: "Each meal can only be couponed once" },
+                { text: "Claims expire after 15 minutes" },
+                ...(currentUser.isFamily ? [
+                  { text: "Family coupons are for all family members together", isHighlighted: true },
+                  { text: "Ensure all family members are present when couponing", isHighlighted: true }
+                ] : [])
+              ]}
+            />
           </div>
+
+          {/* Developer Section */}
+          {process.env.NODE_ENV !== 'production' && (
+            <div className="mt-8 pt-6 border-t border-gray-200">
+              <div className="rounded-md bg-gray-50 p-4">
+                <div className="flex">
+                  <div className="flex-shrink-0">
+                    <Building className="h-5 w-5 text-gray-400" aria-hidden="true" />
+                  </div>
+                  <div className="ml-3">
+                    <h3 className="text-sm font-medium text-gray-800">Developer Resources</h3>
+                    <div className="mt-2 text-sm text-gray-700">
+                      <p>Check out the UI component library for this project:</p>
+                      <a
+                        href="/ui-components"
+                        className="mt-2 inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+                      >
+                        View Component Library
+                      </a>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

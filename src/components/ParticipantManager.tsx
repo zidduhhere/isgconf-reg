@@ -24,10 +24,10 @@ export const ParticipantManager: React.FC = () => {
         isFamily: false
     });
 
-    const filteredParticipants = participants.filter(p =>
+    const filteredParticipants = participants?.filter(p =>
         p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         p.phoneNumber.includes(searchTerm)
-    );
+    ) || [];
 
     const resetForm = () => {
         setFormData({
@@ -49,9 +49,9 @@ export const ParticipantManager: React.FC = () => {
         };
 
         let success = false;
-        if (editingParticipant) {
+        if (editingParticipant && editParticipant) {
             success = await editParticipant(editingParticipant.id, participantData);
-        } else {
+        } else if (createParticipant) {
             success = await createParticipant(participantData);
         }
 
@@ -72,19 +72,19 @@ export const ParticipantManager: React.FC = () => {
     };
 
     const handleDelete = async (participant: Participant) => {
-        if (window.confirm(`Are you sure you want to delete ${participant.name}? This will also remove all their coupons.`)) {
+        if (removeParticipant && window.confirm(`Are you sure you want to delete ${participant.name}? This will also remove all their coupons.`)) {
             await removeParticipant(participant.id);
         }
     };
 
     const handleActivateAllCoupons = async (participantId: string) => {
-        if (window.confirm('Activate all coupons for this participant?')) {
+        if (activateAllCoupons && window.confirm('Activate all coupons for this participant?')) {
             await activateAllCoupons(participantId);
         }
     };
 
     const handleDeactivateAllCoupons = async (participantId: string) => {
-        if (window.confirm('Deactivate all active coupons for this participant?')) {
+        if (deactivateAllCoupons && window.confirm('Deactivate all active coupons for this participant?')) {
             await deactivateAllCoupons(participantId);
         }
     };
@@ -270,8 +270,8 @@ export const ParticipantManager: React.FC = () => {
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap">
                                         <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${participant.isFamily
-                                                ? 'bg-purple-100 text-purple-800'
-                                                : 'bg-gray-100 text-gray-800'
+                                            ? 'bg-purple-100 text-purple-800'
+                                            : 'bg-gray-100 text-gray-800'
                                             }`}>
                                             {participant.familySize} {participant.familySize === 1 ? 'person' : 'people'}
                                         </span>
