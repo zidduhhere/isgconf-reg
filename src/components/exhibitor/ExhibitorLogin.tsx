@@ -1,10 +1,9 @@
 import React, { useState } from 'react';
-import { Building2, Lock, LogIn } from 'lucide-react';
+import { Building2, LogIn } from 'lucide-react';
 import { useExhibitor } from '../../contexts/ExhibitorContext';
 
 const ExhibitorLogin: React.FC = () => {
     const [companyId, setCompanyId] = useState('');
-    const [password, setPassword] = useState('');
     const [isLogging, setIsLogging] = useState(false);
     const [error, setError] = useState('');
 
@@ -13,8 +12,8 @@ const ExhibitorLogin: React.FC = () => {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
 
-        if (!companyId.trim() || !password.trim()) {
-            setError('Please enter both Company ID and Password');
+        if (!companyId.trim()) {
+            setError('Please enter Company ID');
             return;
         }
 
@@ -22,10 +21,10 @@ const ExhibitorLogin: React.FC = () => {
         setError('');
 
         try {
-            const success = await login(companyId.trim(), password);
+            const success = await login(companyId.trim());
 
             if (!success) {
-                setError('Invalid Company ID or Password');
+                setError('Invalid Company ID');
             }
         } catch (error) {
             console.error('Login error:', error);
@@ -69,24 +68,6 @@ const ExhibitorLogin: React.FC = () => {
                         </div>
                     </div>
 
-                    <div>
-                        <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
-                            Password
-                        </label>
-                        <div className="relative">
-                            <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-                            <input
-                                id="password"
-                                type="password"
-                                value={password}
-                                onChange={(e) => setPassword(e.target.value)}
-                                placeholder="Enter your password"
-                                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                disabled={isLogging}
-                            />
-                        </div>
-                    </div>
-
                     {error && (
                         <div className="bg-red-50 border border-red-200 rounded-lg p-4">
                             <p className="text-red-700 text-sm">{error}</p>
@@ -113,11 +94,11 @@ const ExhibitorLogin: React.FC = () => {
                 </form>
 
                 <div className="mt-8 p-4 bg-gray-50 rounded-lg">
-                    <h3 className="text-sm font-medium text-gray-700 mb-2">Default Login Credentials:</h3>
+                    <h3 className="text-sm font-medium text-gray-700 mb-2">Login Information:</h3>
                     <div className="text-xs text-gray-600 space-y-1">
                         <p><strong>Company ID:</strong> EXH001, EXH002, EXH003, EXH004</p>
-                        <p><strong>Password:</strong> participanthere</p>
                         <p><strong>Note:</strong> Company ID is converted to email format (e.g., exh001@isgcon.com)</p>
+                        <p><strong>Authentication:</strong> Uses default password automatically</p>
                     </div>
                 </div>
             </div>

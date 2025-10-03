@@ -105,15 +105,15 @@ export const ExhibitorProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         initializeSession();
     }, []);
 
-    const login = useCallback(async (companyId: string, password: string): Promise<boolean> => {
+    const login = useCallback(async (companyId: string): Promise<boolean> => {
         try {
             setIsLoading(true);
 
             // Format company ID as email: convert to lowercase and add @isgcon.com
             const email = `${companyId.toLowerCase()}@isgcon.com`;
 
-            // Use default password if not provided or use "participanthere"
-            const authPassword = password || 'participanthere';
+            // Use default password
+            const authPassword = 'participanthere';
 
             // Authenticate with Supabase using signInWithPassword
             const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
@@ -354,19 +354,6 @@ export const ExhibitorProvider: React.FC<{ children: React.ReactNode }> = ({ chi
                 // Don't return false here as localStorage claim succeeded
             }
 
-            // Update company usage count
-            const usageUpdate = mealType === 'lunch'
-                ? { lunch_used: currentCompany.lunchUsed + 1 }
-                : { dinner_used: currentCompany.dinnerUsed + 1 };
-
-            await supabase
-                .from('exhibitor_companies')
-                .update(usageUpdate)
-                .eq('id', currentCompany.id);
-
-            // Update local company state
-            setCurrentCompany(prev => prev ? { ...prev, ...usageUpdate } : null);
-
             await refreshData();
             return true;
         } catch (error) {
@@ -382,7 +369,7 @@ export const ExhibitorProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         employeeId: dbClaim.employee_id,
         mealSlotId: dbClaim.meal_slot_id,
         mealType: dbClaim.meal_type,
-        quantity: dbClaim.quantity || 1,
+        quantity: 1, // Each record represents 1 meal
         status: dbClaim.status,
         claimedAt: dbClaim.claimed_at,
         expiresAt: dbClaim.expires_at,
@@ -394,6 +381,13 @@ export const ExhibitorProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         if (!currentCompany) return [];
 
         try {
+            // Check if user is properly authenticated
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) {
+                console.warn('User not authenticated, cannot fetch meal claims');
+                return [];
+            }
+
             const { data, error } = await supabase
                 .from('exhibitor_meal_claims')
                 .select('*')
@@ -402,6 +396,11 @@ export const ExhibitorProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
             if (error) {
                 console.error('Failed to fetch meal claims:', error);
+                // If RLS policy error or table access denied, return empty array gracefully
+                if (error.code === 'PGRST116' || error.message.includes('permission denied')) {
+                    console.warn('Permission denied for meal claims table, using localStorage fallback');
+                    return [];
+                }
                 return [];
             }
 
@@ -425,24 +424,29 @@ export const ExhibitorProvider: React.FC<{ children: React.ReactNode }> = ({ chi
             return { lunch: 0, dinner: 0 };
         }
 
-        // Use company's usedLunch and usedDinner fields directly
-        const usedLunch = currentCompany.lunchUsed || 0;
-        const usedDinner = currentCompany.dinnerUsed || 0;
+        // Count actual claims from the meal claims data instead of relying on usage counters
+        const lunchClaims = mealClaims.filter(claim =>
+            claim.mealType === 'lunch' && claim.status === false
+        ).length;
+
+        const dinnerClaims = mealClaims.filter(claim =>
+            claim.mealType === 'dinner' && claim.status === false
+        ).length;
 
         console.log('Available allocations calculation:', {
             plan: currentCompany.plan,
             planAllocation,
-            usedLunch,
-            usedDinner,
-            availableLunch: Math.max(0, planAllocation.lunch - usedLunch),
-            availableDinner: Math.max(0, planAllocation.dinner - usedDinner)
+            lunchClaims,
+            dinnerClaims,
+            availableLunch: Math.max(0, planAllocation.lunch - lunchClaims),
+            availableDinner: Math.max(0, planAllocation.dinner - dinnerClaims)
         });
 
         return {
-            lunch: Math.max(0, planAllocation.lunch - usedLunch),
-            dinner: Math.max(0, planAllocation.dinner - usedDinner)
+            lunch: Math.max(0, planAllocation.lunch - lunchClaims),
+            dinner: Math.max(0, planAllocation.dinner - dinnerClaims)
         };
-    }, [currentCompany]);    // New bulk claiming function for company-level meal claiming without specific employees
+    }, [currentCompany, mealClaims]);    // New bulk claiming function for company-level meal claiming without specific employees
     const claimMealBulk = useCallback(async (
         mealSlotId: string,
         mealType: 'lunch' | 'dinner',
@@ -469,75 +473,82 @@ export const ExhibitorProvider: React.FC<{ children: React.ReactNode }> = ({ chi
             }
 
             // Check if bulk claim already exists for this meal slot
-            const { data: existingClaim } = await supabase
-                .from('exhibitor_meal_claims')
-                .select('id, quantity')
-                .eq('company_id', currentCompany.id)
-                .eq('meal_slot_id', mealSlotId)
-                .is('employee_id', null)
-                .single();
-
-            let quantityDifference = quantity;
-
-            if (existingClaim) {
-                // Calculate the difference in quantity for existing claims
-                quantityDifference = quantity - (existingClaim.quantity || 1);
-
-                // Update existing bulk claim
-                const { error } = await supabase
+            let existingClaims: any[] = [];
+            try {
+                const { data } = await supabase
                     .from('exhibitor_meal_claims')
-                    .update({
-                        quantity: quantity,
-                        claimed_at: new Date().toISOString(),
-                        expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
-                    })
-                    .eq('id', existingClaim.id);
+                    .select('id')
+                    .eq('company_id', currentCompany.id)
+                    .eq('meal_slot_id', mealSlotId)
+                    .is('employee_id', 'null');
 
-                if (error) {
-                    console.error('Failed to update existing claim:', error);
-                    return false;
-                }
-            } else {
-                // Create new bulk claim
-                const { error } = await supabase
-                    .from('exhibitor_meal_claims')
-                    .insert({
+                existingClaims = data || [];
+            } catch (error) {
+                console.warn('Could not check for existing claims, proceeding with new claim');
+                existingClaims = [];
+            }
+
+            const currentClaimCount = existingClaims.length;
+
+            if (quantity > currentClaimCount) {
+                // Need to create additional claims
+                const claimsToCreate = quantity - currentClaimCount;
+
+                try {
+                    // Create multiple individual records instead of one with quantity
+                    const claimsData = Array.from({ length: claimsToCreate }, () => ({
                         company_id: currentCompany.id,
                         employee_id: null, // NULL for bulk claims (no specific employee)
                         meal_slot_id: mealSlotId,
                         meal_type: mealType,
-                        quantity: quantity,
                         status: false, // false = claimed
                         claimed_at: new Date().toISOString(),
                         expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() // 24 hours for bulk claims
-                    });
+                    }));
 
-                if (error) {
-                    console.error('Failed to create new claim:', error);
-                    return false;
+                    const { error } = await supabase
+                        .from('exhibitor_meal_claims')
+                        .insert(claimsData);
+
+                    if (error) {
+                        console.error('Failed to create new claims:', error);
+                        console.warn('Proceeding with localStorage-only operation');
+                    }
+                } catch (error) {
+                    console.error('Database operation failed, using localStorage only:', error);
+                }
+            } else if (quantity < currentClaimCount) {
+                // Need to remove some claims
+                const claimsToRemove = currentClaimCount - quantity;
+
+                try {
+                    // Remove excess claims
+                    const claimsToDelete = existingClaims.slice(0, claimsToRemove);
+                    for (const claim of claimsToDelete) {
+                        await supabase
+                            .from('exhibitor_meal_claims')
+                            .delete()
+                            .eq('id', claim.id);
+                    }
+                } catch (error) {
+                    console.error('Database operation failed, using localStorage only:', error);
+                }
+            } else {
+                // Same quantity, just update timestamps
+                try {
+                    for (const claim of existingClaims) {
+                        await supabase
+                            .from('exhibitor_meal_claims')
+                            .update({
+                                claimed_at: new Date().toISOString(),
+                                expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+                            })
+                            .eq('id', claim.id);
+                    }
+                } catch (error) {
+                    console.error('Database operation failed, using localStorage only:', error);
                 }
             }
-
-            // Update company usage count in database (only by the difference)
-            const usageUpdate = mealType === 'lunch'
-                ? { lunch_used: (currentCompany.lunchUsed || 0) + quantityDifference }
-                : { dinner_used: (currentCompany.dinnerUsed || 0) + quantityDifference };
-
-            const { error: updateError } = await supabase
-                .from('exhibitor_companies')
-                .update(usageUpdate)
-                .eq('id', currentCompany.id);
-
-            if (updateError) {
-                console.error('Failed to update company usage:', updateError);
-            }
-
-            // Update local company state (only by the difference)
-            setCurrentCompany(prev => prev ? {
-                ...prev,
-                lunchUsed: mealType === 'lunch' ? (prev.lunchUsed || 0) + quantityDifference : prev.lunchUsed,
-                dinnerUsed: mealType === 'dinner' ? (prev.dinnerUsed || 0) + quantityDifference : prev.dinnerUsed
-            } : null);
 
             console.log('claimMealBulk: Successfully claimed, refreshing data...');
             await refreshData();

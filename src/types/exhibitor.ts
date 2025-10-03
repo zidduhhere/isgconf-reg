@@ -45,7 +45,7 @@ export interface ExhibitorContextType {
   isLoading: boolean;
   
   // Auth functions
-  login: (companyId: string, password: string) => Promise<boolean>;
+  login: (companyId: string) => Promise<boolean>;
   logout: () => void;
   
   // Employee management
