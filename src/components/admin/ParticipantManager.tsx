@@ -3,21 +3,21 @@
 // import { Participant } from '../../types';
 // import { Plus, Edit2, Trash2, Users, UserCheck, UserX, Search, X } from 'lucide-react';
 
-// export const ParticipantManager: React.FC = (): => {
-//     const {
-//         participants,
-//         isLoading,
-//         createParticipant,
-//         editParticipant,
-//         removeParticipant,
-//         activateAllCoupons,
-//         deactivateAllCoupons
-//     } = useAdmin();
+export const ParticipantManager: React.FC = () => {
+    const {
+        participants,
+        isLoading,
+        createParticipant,
+        editParticipant,
+        removeParticipant,
+        activateAllCoupons,
+        deactivateAllCoupons
+    } = useAdmin();
 
-//     const [showCreateForm, setShowCreateForm] = useState(false);
-//     const [editingParticipant, setEditingParticipant] = useState<Participant | null>(null);
-//     const [searchTerm, setSearchTerm] = useState('');
-//     const [formData, setFormData] = useState({
+    const [showCreateForm, setShowCreateForm] = useState(false);
+    const [editingParticipant, setEditingParticipant] = useState<Participant | null>(null);
+    const [searchTerm, setSearchTerm] = useState('');
+    const [formData, setFormData] = useState({
 //         name: '',
 //         phoneNumber: '',
 //         familySize: 1,
@@ -322,8 +322,9 @@
 //                                 {searchTerm ? 'Try adjusting your search terms.' : 'Get started by adding a new participant.'}
 //                             </p>
 //                         </div>
-//                     )}
-//                 </div>
-//             </div>
-//         );
-//     };
+                )
+}
+            </div >
+        </div >
+    );
+};

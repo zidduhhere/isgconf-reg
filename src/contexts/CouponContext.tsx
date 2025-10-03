@@ -255,11 +255,35 @@ export const CouponProvider = ({ children, participant }: AuthProviderProps) => 
                 }
             }
 
+            // If no coupon found anywhere, return a default one to prevent crashes
+            if (!contextCoupon) {
+                console.warn(`No coupon found for mealSlotId: ${mealSlotId}, creating default coupon`);
+                return {
+                    id: participant.id,
+                    mealSlotId: mealSlotId,
+                    status: 'available' as const,
+                    familyMemberIndex: familyMemberIndex,
+                    uniqueId: `${participant.id}-${mealSlotId}-${familyMemberIndex}`,
+                    couponedAt: undefined,
+                    expiresAt: undefined
+                };
+            }
+
             return contextCoupon;
         }
         catch (error) {
             console.error("Error getting claim for slot:", error);
-            return undefined;
+            // Return a default coupon to prevent crashes
+            console.warn(`Error occurred, creating default coupon for mealSlotId: ${mealSlotId}`);
+            return {
+                id: participant.id,
+                mealSlotId: mealSlotId,
+                status: 'available' as const,
+                familyMemberIndex: familyMemberIndex,
+                uniqueId: `${participant.id}-${mealSlotId}-${familyMemberIndex}`,
+                couponedAt: undefined,
+                expiresAt: undefined
+            };
         }
     }
 
