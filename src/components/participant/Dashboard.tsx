@@ -1,12 +1,12 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { LogOut, User, Utensils, Users, ImageIcon, UserSquare2, Building } from 'lucide-react';
-import { useAuth } from '../contexts/AuthContext';
-import { ImagePlaceholder, Instructions } from './ui';
+import { useAuth } from '../../contexts/AuthContext';
+import { ImagePlaceholder, Instructions } from '../ui';
 import { MealCard } from './MealCard';
 import { FamilyCouponCard } from './FamilyCouponCard';
-import { MEAL_SLOTS as mealSlots } from '../data/mockData';
-import { useCoupon } from '../contexts/CouponContext';
+import { MEAL_SLOTS as mealSlots } from '../../data/mockData';
+import { useCoupon } from '../../contexts/CouponContext';
 
 
 export const Dashboard: React.FC = () => {
@@ -113,7 +113,7 @@ export const Dashboard: React.FC = () => {
 
 
           {/* Family Coupons Section - Only show if participant has family */}
-          {currentUser.isFamily && (
+          {currentUser.isFam && (
             <div className="mt-8">
               <div className="text-center mb-6">
                 <div className="bg-white/80 backdrop-blur-lg w-16 h-16 rounded-full shadow-lg flex items-center justify-center mx-auto mb-3">
@@ -138,7 +138,7 @@ export const Dashboard: React.FC = () => {
                         {mealSlots.map((slot) => {
                           const familyCoupon = getClaimForSlot(slot.id, familyMemberIndex);
                           const familyTimeRemaining = getRemainingTime(`${slot.id}-family-${familyMemberIndex}`, familyMemberIndex);
-
+                          console.log(`Family Member ${familyMemberIndex}, Meal Slot ${slot.id}, Coupon:`, familyCoupon);
                           return (
                             <FamilyCouponCard
                               key={`family-${familyMemberIndex}-${slot.id}`}
@@ -222,7 +222,7 @@ export const Dashboard: React.FC = () => {
                 { text: "Show the GREEN card to food servers" },
                 { text: "Each meal can only be couponed once" },
                 { text: "Claims expire after 15 minutes" },
-                ...(currentUser.isFamily ? [
+                ...(currentUser.isFam ? [
                   { text: "Family coupons are for all family members together", isHighlighted: true },
                   { text: "Ensure all family members are present when couponing", isHighlighted: true }
                 ] : [])

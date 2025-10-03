@@ -1,12 +1,9 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { LoginForm } from './components/LoginForm';
-import { Dashboard } from './components/Dashboard';
-import { AdminLogin } from './components/AdminLogin';
-import { AdminDashboardNew } from './components/AdminDashboardNew';
-import ComponentLibrary from './components/ComponentLibrary';
-import ExhibitorApp from './components/ExhibitorApp';
-import Navigation from './components/Navigation';
+import { LoginForm, Dashboard } from './components/participant';
+import { AdminLogin, AdminDashboard } from './components/admin';
+import { ExhibitorApp } from './components/exhibitor';
+import { Navigation } from './components/shared';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { CouponProvider } from './contexts/CouponContext';
 import { AdminProvider, useAdmin } from './contexts/AdminContext';
@@ -89,12 +86,9 @@ const AppContent: React.FC = () => {
       } />
       <Route path="/admin/dashboard" element={
         <ProtectedAdminRoute>
-          <AdminDashboardNew />
+          <AdminDashboard />
         </ProtectedAdminRoute>
       } />
-
-      {/* Component Library - Development Only */}
-      <Route path="/ui-components" element={<ComponentLibrary />} />
 
       {/* Fallback */}
       <Route path="*" element={<Navigate to="/" />} />

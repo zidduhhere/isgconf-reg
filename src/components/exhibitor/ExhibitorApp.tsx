@@ -1,8 +1,8 @@
 import React from 'react';
-import { ExhibitorProvider, useExhibitor } from '../contexts/ExhibitorContext';
+import { ExhibitorProvider, useExhibitor } from '../../contexts/ExhibitorContext';
 import ExhibitorLogin from './ExhibitorLogin';
 import ExhibitorDashboard from './ExhibitorDashboard';
-import Navigation from './Navigation';
+import { Navigation } from '../shared';
 
 const ExhibitorAppContent: React.FC = () => {
     const { currentCompany, isLoading } = useExhibitor();

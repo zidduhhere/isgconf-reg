@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Clock, CheckCircle, XCircle, Star, X, Check, Users, Lock, Timer, CalendarClock } from 'lucide-react';
-import { MealSlot, Coupon, Participant } from '../types';
-import { formatTimeRemaining, getMealTimeStatus } from '../utils/timeUtils';
+import { MealSlot, Coupon, Participant } from '../../types';
+import { formatTimeRemaining, getMealTimeStatus } from '../../utils/timeUtils';
 
 interface FamilyCouponCardProps {
     mealSlot: MealSlot;

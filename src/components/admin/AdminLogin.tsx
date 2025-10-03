@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { useAdmin } from '../contexts/AdminContext';
+import { useAdmin } from '../../contexts/AdminContext';
 import { Shield, Eye, EyeOff, Lock, ArrowLeft, Mail } from 'lucide-react';
 
 export const AdminLogin: React.FC = () => {

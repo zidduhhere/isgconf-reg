@@ -1,9 +1,9 @@
 // import React, { useState } from 'react';
-// import { useAdmin } from '../contexts/AdminContext';
-// import { Participant } from '../types';
+// import { useAdmin } from '../../contexts/AdminContext';
+// import { Participant } from '../../types';
 // import { Plus, Edit2, Trash2, Users, UserCheck, UserX, Search, X } from 'lucide-react';
 
-// export const ParticipantManager: React.FC = () => {
+// export const ParticipantManager: React.FC = (): => {
 //     const {
 //         participants,
 //         isLoading,

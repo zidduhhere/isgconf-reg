@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Smartphone, ArrowRight, Stethoscope, Shield, Users, Award } from 'lucide-react';
-import { useAuth } from '../contexts/AuthContext';
-import { EventDetails, FeatureGrid } from './ui';
+import { useAuth } from '../../contexts/AuthContext';
+import { EventDetails, FeatureGrid } from '../ui';
 
 export const LoginForm: React.FC = () => {
   const { login, loginError, isLoading, currentUser } = useAuth();

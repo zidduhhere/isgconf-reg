@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Building2, Lock, LogIn } from 'lucide-react';
-import { useExhibitor } from '../contexts/ExhibitorContext';
+import { useExhibitor } from '../../contexts/ExhibitorContext';
 
 const ExhibitorLogin: React.FC = () => {
     const [companyId, setCompanyId] = useState('');

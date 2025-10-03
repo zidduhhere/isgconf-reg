@@ -23,7 +23,7 @@ export interface ParticipantAdmin {
   phoneNumber: string;
   name: string;
   familySize: number;
-  isFamily: boolean;
+  isFam: boolean;
   createdAt: string;
   updatedAt: string;
   couponsCount: number;

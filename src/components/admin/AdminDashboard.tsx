@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAdmin } from '../contexts/AdminContext';
+import { useAdmin } from '../../contexts/AdminContext';
 import {
     Users,
     Building2,
@@ -25,7 +25,7 @@ import {
     AlertCircle,
     Shield
 } from 'lucide-react';
-import { ParticipantAdmin, ExhibitorAdmin, CouponAdmin, MealClaimAdmin } from '../types/admin';
+import { ParticipantAdmin, ExhibitorAdmin, CouponAdmin, MealClaimAdmin } from '../../types/admin';
 
 type TabType = 'overview' | 'participants' | 'exhibitors' | 'coupons' | 'claims' | 'analytics';
 

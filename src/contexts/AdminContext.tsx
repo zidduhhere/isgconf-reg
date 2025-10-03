@@ -226,7 +226,7 @@ export const AdminProvider: React.FC<AdminProviderProps> = ({ children }) => {
                 phoneNumber: p.phoneNumber, // Use correct column name
                 name: p.name,
                 familySize: p.famSize || 1, // Use correct column name
-                isFamily: p.isFam || false, // Use correct column name
+                isFam: p.isFam || false, // Use correct column name
                 couponsCount: 0, // Will be calculated separately
                 activeCouponsCount: 0, // Will be calculated separately
                 createdAt: new Date().toISOString(), // Add default since no created_at in DB
@@ -249,7 +249,7 @@ export const AdminProvider: React.FC<AdminProviderProps> = ({ children }) => {
                     phoneNumber: data.phoneNumber, // Use correct column name
                     name: data.name,
                     famSize: data.familySize || 1, // Use correct column name
-                    isFam: data.isFamily || false // Use correct column name
+                    isFam: data.isFam || false // Use correct column name
                 });
 
             if (error) throw error;
@@ -272,7 +272,7 @@ export const AdminProvider: React.FC<AdminProviderProps> = ({ children }) => {
                     phoneNumber: data.phoneNumber, // Use correct column name
                     name: data.name,
                     famSize: data.familySize, // Use correct column name
-                    isFam: data.isFamily // Use correct column name
+                    isFam: data.isFam // Use correct column name
                 })
                 .eq('id', id);
 
@@ -698,7 +698,7 @@ export const AdminProvider: React.FC<AdminProviderProps> = ({ children }) => {
             };
         }
         const total = participants.length;
-        const withFamily = participants.filter(p => p.isFamily).length;
+        const withFamily = participants.filter(p => p.isFam).length;
         const activeCoupons = allClaims.filter(c => c.status === 'active').length;
         const usedCoupons = allClaims.filter(c => c.status === 'used').length;
 

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef, memo } from 'react';
 import { Clock, CheckCircle, XCircle, Star, Gift, X, Check, Lock, Timer, CalendarClock, AlertCircle } from 'lucide-react';
-import { MealCardProps } from '../types';
-import { getMealTimeStatus } from '../utils/timeUtils';
+import { MealCardProps } from '../../types';
+import { getMealTimeStatus } from '../../utils/timeUtils';
 
 export const MealCard: React.FC<MealCardProps> = memo(({
   mealSlot,

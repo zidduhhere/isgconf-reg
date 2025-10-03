@@ -3,7 +3,7 @@ export interface Participant {
   phoneNumber: string;
   name: string;
   familySize: number; // Number of people including the participant (1-4)
-  isFamily: boolean; // Whether this participant has family members
+  isFam: boolean; // Whether this participant has family members
 }
 
 export type MealTimeStatus = 'upcoming' | 'active' | 'past';

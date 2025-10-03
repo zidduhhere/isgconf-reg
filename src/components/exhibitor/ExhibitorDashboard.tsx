@@ -9,7 +9,7 @@ import {
     Star,
     Circle
 } from 'lucide-react';
-import { useExhibitor } from '../contexts/ExhibitorContext';
+import { useExhibitor } from '../../contexts/ExhibitorContext';
 import ExhibitorMealCard from './ExhibitorMealCard';
 
 const MEAL_SLOTS = [
