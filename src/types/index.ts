@@ -4,6 +4,8 @@ export interface Participant {
   name: string;
   familySize: number; // Number of people including the participant (1-4)
   isFam: boolean; // Whether this participant has family members
+  hospitalName?: string; // Optional hospital name
+  isFaculty?: boolean; // Whether the participant is faculty
 }
 
 export type MealTimeStatus = 'upcoming' | 'active' | 'past';

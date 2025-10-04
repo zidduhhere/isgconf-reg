@@ -31,8 +31,6 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     useEffect(() => {
         const initializeAuth = async () => {
             try {
-                if (currentUser) return; // If we already have a user, skip
-
                 const session = await supabase.auth.getSession();
                 if (session.data.session) {
                     const participant = await getParticipantDetails(session.data.session.user.id);
@@ -50,7 +48,24 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         };
 
         initializeAuth();
-    }, [currentUser]);
+
+        // Listen for auth state changes
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+            console.log('Auth state changed:', event, session);
+
+            if (event === 'SIGNED_IN' && session) {
+                const participant = await getParticipantDetails(session.user.id);
+                if (participant) {
+                    setCurrentUserState(participant);
+                }
+            } else if (event === 'SIGNED_OUT') {
+                setCurrentUserState(null);
+                localStorage.clear(); // Clear localStorage on sign out
+            }
+        });
+
+        return () => subscription.unsubscribe();
+    }, []); // Remove currentUser dependency to prevent infinite loop
 
 
     const login = async (phoneNumber: string): Promise<void> => {
@@ -88,6 +103,9 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         await supabase.auth.signOut();
         setCurrentUserState(null);
         setLoginError(null);
+
+        // Clear all localStorage data on logout
+        localStorage.clear();
     };
 
     const clearLoginError = (): void => {

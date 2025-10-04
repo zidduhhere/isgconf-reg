@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
     Building2,
     UtensilsCrossed,
@@ -7,7 +7,8 @@ import {
     Crown,
     Award,
     Star,
-    Circle
+    Circle,
+    Users
 } from 'lucide-react';
 import { useExhibitor } from '../../contexts/ExhibitorContext';
 import ExhibitorMealCard from './ExhibitorMealCard';
@@ -51,25 +52,38 @@ const getPlanColor = (plan: string) => {
 const ExhibitorDashboard: React.FC = () => {
     const {
         currentCompany,
+        employees,
         logout,
         getAvailableAllocations,
         claimMealBulk,
-        refreshData
+        refreshData,
+        mealClaims
     } = useExhibitor();
 
     const [isClaimingMeal, setIsClaimingMeal] = useState<string | null>(null);
+    const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>('');
 
-    const allocations = getAvailableAllocations();
+    // Recalculate allocations when mealClaims change
+    const allocations = useMemo(() => {
+        return getAvailableAllocations();
+    }, [getAvailableAllocations, mealClaims]);
 
     useEffect(() => {
         if (currentCompany) {
             console.log('ExhibitorDashboard: Loading data for company:', currentCompany);
             refreshData();
         }
-    }, [currentCompany, refreshData]);
+    }, [currentCompany?.id, refreshData]); // Only depend on company ID, not the entire company object
+
+    // Set default employee if there's only one employee
+    useEffect(() => {
+        if (employees.length === 1 && !selectedEmployeeId) {
+            setSelectedEmployeeId(employees[0].id);
+        }
+    }, [employees, selectedEmployeeId]);
 
     const handleClaimMeal = async (mealSlotId: string, mealType: 'lunch' | 'dinner', quantity: number) => {
-        if (!currentCompany || isClaimingMeal) return;
+        if (!currentCompany || isClaimingMeal || !selectedEmployeeId) return;
 
         // Check if we have enough allocation
         const available = mealType === 'lunch' ? allocations.lunch : allocations.dinner;
@@ -81,11 +95,12 @@ const ExhibitorDashboard: React.FC = () => {
         setIsClaimingMeal(mealSlotId);
 
         try {
-            const success = await claimMealBulk(mealSlotId, mealType, quantity);
+            const success = await claimMealBulk(mealSlotId, mealType, quantity, selectedEmployeeId);
 
             if (success) {
-                await refreshData(); // Refresh to get updated counts
-                alert(`Successfully claimed ${quantity} ${mealType}(s) for ${mealSlotId}`);
+                // No need to call refreshData here as claimMealBulk already calls it
+                const selectedEmployee = employees.find(emp => emp.id === selectedEmployeeId);
+                alert(`Successfully claimed ${quantity} ${mealType}(s) for ${selectedEmployee?.employeeName} in ${mealSlotId}`);
             } else {
                 alert('Failed to claim meal. Please try again.');
             }
@@ -168,30 +183,77 @@ const ExhibitorDashboard: React.FC = () => {
                     </div>
                 </div>
 
+                {/* Employee Selection */}
+                <div className="bg-white rounded-lg shadow mb-6">
+                    <div className="px-6 py-4 border-b border-gray-200">
+                        <h2 className="text-lg font-medium text-gray-900">Employee Selection</h2>
+                        <p className="text-sm text-gray-500">Select the employee for whom you want to claim meals</p>
+                    </div>
+                    <div className="p-6">
+                        {employees.length === 0 ? (
+                            <div className="text-center py-4">
+                                <Users className="h-8 w-8 text-gray-400 mx-auto mb-2" />
+                                <p className="text-gray-500">No employees found. Please add employees first.</p>
+                            </div>
+                        ) : (
+                            <div className="max-w-md">
+                                <label htmlFor="employee-select" className="block text-sm font-medium text-gray-700 mb-2">
+                                    Select Employee
+                                </label>
+                                <select
+                                    id="employee-select"
+                                    value={selectedEmployeeId}
+                                    onChange={(e) => setSelectedEmployeeId(e.target.value)}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                >
+                                    <option value="">Choose an employee...</option>
+                                    {employees.map((employee) => (
+                                        <option key={employee.id} value={employee.id}>
+                                            {employee.employeeName} {employee.employeePhone && `(${employee.employeePhone})`}
+                                        </option>
+                                    ))}
+                                </select>
+                                {!selectedEmployeeId && employees.length > 0 && (
+                                    <p className="mt-2 text-sm text-amber-600">
+                                        Please select an employee to claim meals
+                                    </p>
+                                )}
+                            </div>
+                        )}
+                    </div>
+                </div>
+
                 {/* Meal Claiming Section */}
                 <div className="bg-white rounded-lg shadow">
                     <div className="px-6 py-4 border-b border-gray-200">
                         <h2 className="text-lg font-medium text-gray-900">Meal Claiming</h2>
-                        <p className="text-sm text-gray-500">Click on a meal slot to claim meals for your company</p>
+                        <p className="text-sm text-gray-500">Click on a meal slot to claim meals for the selected employee</p>
                     </div>
 
                     <div className="p-6 space-y-6">
-                        {MEAL_SLOTS.map((slot) => {
-                            const isAvailable = slot.type === 'lunch' ? allocations.lunch > 0 : allocations.dinner > 0;
-                            const maxQuantity = slot.type === 'lunch' ? allocations.lunch : allocations.dinner;
-                            const isClaiming = isClaimingMeal === slot.id;
+                        {selectedEmployeeId ? (
+                            MEAL_SLOTS.map((slot) => {
+                                const isAvailable = slot.type === 'lunch' ? allocations.lunch > 0 : allocations.dinner > 0;
+                                const maxQuantity = slot.type === 'lunch' ? allocations.lunch : allocations.dinner;
+                                const isClaiming = isClaimingMeal === slot.id;
 
-                            return (
-                                <ExhibitorMealCard
-                                    key={slot.id}
-                                    mealSlot={slot}
-                                    isAvailable={isAvailable}
-                                    maxQuantity={maxQuantity}
-                                    onClaim={(quantity: number) => handleClaimMeal(slot.id, slot.type, quantity)}
-                                    isLoading={isClaiming}
-                                />
-                            );
-                        })}
+                                return (
+                                    <ExhibitorMealCard
+                                        key={slot.id}
+                                        mealSlot={slot}
+                                        isAvailable={isAvailable}
+                                        maxQuantity={maxQuantity}
+                                        onClaim={(quantity: number) => handleClaimMeal(slot.id, slot.type, quantity)}
+                                        isLoading={isClaiming}
+                                    />
+                                );
+                            })
+                        ) : (
+                            <div className="text-center py-8">
+                                <UtensilsCrossed className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                                <p className="text-gray-500">Please select an employee to start claiming meals</p>
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>

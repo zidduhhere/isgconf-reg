@@ -148,7 +148,7 @@ export const AdminLogin: React.FC = () => {
                     </form>
 
                     {/* Footer */}
-                    <div className="mt-8 text-center">
+                    {/* <div className="mt-8 text-center">
                         <p className="text-xs text-gray-500">
                             Authorized personnel only
                         </p>
@@ -157,7 +157,7 @@ export const AdminLogin: React.FC = () => {
                                 <strong>Demo Password:</strong> admin123
                             </p>
                         </div>
-                    </div>
+                    </div> */}
                 </div>
             </div>
         </div>

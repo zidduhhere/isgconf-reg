@@ -1,4 +1,5 @@
 import { Participant, MealSlot, Coupon } from "../types";
+import { MEAL_SLOTS } from "../data/mockData";
 
 export const STORAGE_KEYS = {
   PARTICIPANTS: "meal_pass_participants",
@@ -259,7 +260,7 @@ export const getParticipants = (): Participant[] => {
 
 export const getMealSlots = (): MealSlot[] => {
   const data = localStorage.getItem(STORAGE_KEYS.MEAL_SLOTS);
-  return data ? JSON.parse(data) : [];
+  return data ? JSON.parse(data) : MEAL_SLOTS;
 };
 
 export const getCoupons = (): Coupon[] => {

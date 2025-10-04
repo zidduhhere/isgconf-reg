@@ -1,7 +1,8 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { Participant, MealSlot, Coupon } from '../types';
-import { AdminContextType, AdminUser, AdminStats, ParticipantAdmin, ExhibitorAdmin, CouponAdmin, MealClaimAdmin, CouponFilters } from '../types/admin';
+import { Participant, MealSlot, Coupon, firstLunch, secondLunch, dinner } from '../types';
+import { AdminContextType, AdminUser, AdminStats, ParticipantAdmin, ExhibitorAdmin, ExhibitorEmployeeAdmin, CouponAdmin, MealClaimAdmin, CouponFilters } from '../types/admin';
 import { supabase } from '../services/supabase';
+import { MEAL_SLOTS } from '../data/mockData';
 import {
     getParticipants as getParticipantsLocal,
     getMealSlots,
@@ -52,8 +53,12 @@ export const AdminProvider: React.FC<AdminProviderProps> = ({ children }) => {
         }
 
         // Load initial data
-        refreshData();
-        refreshStats();
+        const initializeData = async () => {
+            await refreshData();
+            await refreshStats();
+        };
+
+        initializeData();
     }, []);
 
     // New authentication method (email/password)
@@ -117,16 +122,35 @@ export const AdminProvider: React.FC<AdminProviderProps> = ({ children }) => {
     };
 
     // Data refresh functions
-    const refreshData = () => {
+    const refreshData = async () => {
         try {
             setIsLoading(true);
-            setParticipants(getParticipantsLocal());
+
+            // Fetch participants from Supabase
+            const { data: participantsData, error: participantsError } = await supabase
+                .from('participants')
+                .select('*')
+                .order('phoneNumber', { ascending: true }); // Use phoneNumber since created_at doesn't exist
+
+            if (participantsError) {
+                console.error('Error fetching participants:', participantsError);
+                // Fallback to localStorage if Supabase fails
+                setParticipants(getParticipantsLocal());
+            } else {
+                setParticipants(participantsData || []);
+            }
+
+            // Keep using localStorage for meal slots and claims for now
             setMealSlots(getMealSlots());
             setAllClaims(getAllClaims());
             setError(null);
         } catch (err) {
             setError('Failed to load data');
             console.error('Error loading admin data:', err);
+            // Fallback to localStorage on error
+            setParticipants(getParticipantsLocal());
+            setMealSlots(getMealSlots());
+            setAllClaims(getAllClaims());
         } finally {
             setIsLoading(false);
         }
@@ -135,6 +159,7 @@ export const AdminProvider: React.FC<AdminProviderProps> = ({ children }) => {
     const refreshStats = async (): Promise<void> => {
         setIsLoading(true);
         try {
+            console.log('AdminContext: Starting refreshStats...');
             // Get stats from Supabase with fallback for network issues
             const [participantsResult, exhibitorsResult, couponsResult, mealClaimsResult] = await Promise.allSettled([
                 supabase.from('participants').select('*', { count: 'exact' }),
@@ -142,6 +167,13 @@ export const AdminProvider: React.FC<AdminProviderProps> = ({ children }) => {
                 supabase.from('coupons').select('status', { count: 'exact' }),
                 supabase.from('exhibitor_meal_claims').select('*', { count: 'exact' })
             ]);
+
+            console.log('AdminContext: Query results:', {
+                participants: participantsResult.status,
+                exhibitors: exhibitorsResult.status,
+                coupons: couponsResult.status,
+                mealClaims: mealClaimsResult.status
+            });
 
             let totalParticipants = 0;
             let totalExhibitors = 0;
@@ -156,20 +188,30 @@ export const AdminProvider: React.FC<AdminProviderProps> = ({ children }) => {
             // Handle participants
             if (participantsResult.status === 'fulfilled' && participantsResult.value.data) {
                 totalParticipants = participantsResult.value.count || 0;
+                console.log('AdminContext: Total participants:', totalParticipants);
+            } else if (participantsResult.status === 'rejected') {
+                console.error('AdminContext: Participants query failed:', participantsResult.reason);
             }
 
             // Handle exhibitors
             if (exhibitorsResult.status === 'fulfilled' && exhibitorsResult.value.data) {
                 totalExhibitors = exhibitorsResult.value.count || 0;
+                console.log('AdminContext: Total exhibitors:', totalExhibitors);
+            } else if (exhibitorsResult.status === 'rejected') {
+                console.error('AdminContext: Exhibitors query failed:', exhibitorsResult.reason);
             }
 
             // Handle coupons - note: status is boolean in schema
             if (couponsResult.status === 'fulfilled' && couponsResult.value.data) {
                 totalCoupons = couponsResult.value.count || 0;
                 const coupons = couponsResult.value.data || [];
-                activeCoupons = coupons.filter(c => c.status === true).length;
-                claimedCoupons = coupons.filter(c => c.status === false).length;
+                // Correct logic: true = available, false = used/claimed
+                activeCoupons = coupons.filter(c => c.status === true).length; // true = available
+                claimedCoupons = coupons.filter(c => c.status === false).length; // false = used/claimed
                 expiredCoupons = 0; // No expired status in boolean schema
+                console.log('AdminContext: Coupons stats:', { totalCoupons, activeCoupons, claimedCoupons });
+            } else if (couponsResult.status === 'rejected') {
+                console.error('AdminContext: Coupons query failed:', couponsResult.reason);
             }
 
             // Handle meal claims
@@ -178,9 +220,12 @@ export const AdminProvider: React.FC<AdminProviderProps> = ({ children }) => {
                 totalMealClaims = mealClaims.length;
                 lunchClaims = mealClaims.filter(c => c.meal_type === 'lunch').length;
                 dinnerClaims = mealClaims.filter(c => c.meal_type === 'dinner').length;
+                console.log('AdminContext: Meal claims stats:', { totalMealClaims, lunchClaims, dinnerClaims });
+            } else if (mealClaimsResult.status === 'rejected') {
+                console.error('AdminContext: Meal claims query failed:', mealClaimsResult.reason);
             }
 
-            setStats({
+            const finalStats = {
                 totalParticipants,
                 totalExhibitors,
                 totalCoupons,
@@ -190,9 +235,12 @@ export const AdminProvider: React.FC<AdminProviderProps> = ({ children }) => {
                 totalMealClaims,
                 lunchClaims,
                 dinnerClaims
-            });
+            };
+
+            console.log('AdminContext: Final stats:', finalStats);
+            setStats(finalStats);
         } catch (error) {
-            console.error('Error refreshing stats:', error);
+            console.error('AdminContext: Error refreshing stats:', error);
             // Set fallback stats if Supabase is not available
             setStats({
                 totalParticipants: 0,
@@ -225,8 +273,10 @@ export const AdminProvider: React.FC<AdminProviderProps> = ({ children }) => {
                 id: p.id,
                 phoneNumber: p.phoneNumber, // Use correct column name
                 name: p.name,
-                familySize: p.famSize || 1, // Use correct column name
+                familySize: p.familySize || 1, // Use correct column name from database
                 isFam: p.isFam || false, // Use correct column name
+                hospitalName: p.hospitalName || '', // Add missing field
+                isFaculty: p.isFaculty || false, // Add missing field
                 couponsCount: 0, // Will be calculated separately
                 activeCouponsCount: 0, // Will be calculated separately
                 createdAt: new Date().toISOString(), // Add default since no created_at in DB
@@ -243,17 +293,76 @@ export const AdminProvider: React.FC<AdminProviderProps> = ({ children }) => {
     const addParticipant = async (data: Partial<ParticipantAdmin>): Promise<boolean> => {
         setIsLoading(true);
         try {
-            const { error } = await supabase
+            // First, create Supabase auth user
+            const email = `${data.phoneNumber}@isgcon.com`;
+            const password = '123456789';
+
+            const { data: authData, error: authError } = await supabase.auth.signUp({
+                email: email,
+                password: password
+            });
+
+            if (authError) {
+                console.error('Error creating auth user:', authError);
+                throw authError;
+            }
+
+            if (!authData.user?.id) {
+                throw new Error('Failed to create user - no user ID returned');
+            }
+
+            // Then create participant record with the auth user ID
+            const { error: participantError } = await supabase
                 .from('participants')
                 .insert({
-                    phoneNumber: data.phoneNumber, // Use correct column name
+                    id: authData.user.id, // Use the auth user ID
+                    phoneNumber: data.phoneNumber,
                     name: data.name,
-                    famSize: data.familySize || 1, // Use correct column name
-                    isFam: data.isFam || false // Use correct column name
+                    familySize: data.familySize || 1, // Use correct column name
+                    isFam: (data.familySize || 1) > 1 ? true : (data.isFam || false), // Auto-set isFam if familySize > 1
+                    hospitalName: data.hospitalName || '', // Add missing field
+                    isFaculty: data.isFaculty || false // Add missing field
                 });
 
-            if (error) throw error;
+            if (participantError) {
+                console.error('Error adding participant:', participantError);
+                // If participant creation fails, we should clean up the auth user
+                // Note: In a production app, you might want to handle this differently
+                throw participantError;
+            }
+
+            // Create 3 default coupons for the participant
+            const mealSlots = ["0", "1", "2"]; // Use meal slot IDs from mockData.ts
+            const familySize = data.familySize || 1;
+            const couponsToCreate = [];
+
+            // Create coupons for the participant and family members
+            for (let familyMemberIndex = 0; familyMemberIndex < familySize; familyMemberIndex++) {
+                for (const mealSlotId of mealSlots) {
+                    couponsToCreate.push({
+                        id: authData.user.id, // Participant ID (foreign key)
+                        mealSlotId: mealSlotId,
+                        familymemberindex: familyMemberIndex, // Use lowercase as per schema
+                        status: true, // true = available (default behavior)
+                        couponedAt: null,
+                        expiresAt: null
+                    });
+                }
+            }
+
+            // Insert all coupons in batch
+            const { error: couponsError } = await supabase
+                .from('coupons')
+                .insert(couponsToCreate);
+
+            if (couponsError) {
+                console.error('Error creating coupons:', couponsError);
+                // Optionally, we could delete the participant if coupon creation fails
+                // For now, we'll just log the error but still consider the participant creation successful
+            }
+
             await refreshStats();
+            console.log(`Successfully created participant: ${data.name} with email: ${email} and ${couponsToCreate.length} coupons`);
             return true;
         } catch (error) {
             console.error('Error adding participant:', error);
@@ -271,8 +380,10 @@ export const AdminProvider: React.FC<AdminProviderProps> = ({ children }) => {
                 .update({
                     phoneNumber: data.phoneNumber, // Use correct column name
                     name: data.name,
-                    famSize: data.familySize, // Use correct column name
-                    isFam: data.isFam // Use correct column name
+                    familySize: data.familySize, // Use correct column name
+                    isFam: data.isFam, // Use correct column name
+                    hospitalName: data.hospitalName, // Add missing field
+                    isFaculty: data.isFaculty // Add missing field
                 })
                 .eq('id', id);
 
@@ -289,23 +400,65 @@ export const AdminProvider: React.FC<AdminProviderProps> = ({ children }) => {
     const deleteParticipant = async (id: string): Promise<boolean> => {
         setIsLoading(true);
         try {
-            const { error } = await supabase
+            // Start a transaction to delete from all related tables
+            console.log('Deleting participant with ID:', id);
+
+            // First, get participant phone number to construct auth email
+            const { data: participantData, error: fetchError } = await supabase
+                .from('participants')
+                .select('phoneNumber')
+                .eq('id', id)
+                .single();
+
+            if (fetchError) {
+                console.error('Error fetching participant data:', fetchError);
+                throw fetchError;
+            }
+
+            const phoneNumber = participantData?.phoneNumber;
+            console.log('Participant phone number:', phoneNumber);
+
+            // Delete related coupons first (using 'id' field which links to participant)
+            const { error: couponsError } = await supabase
+                .from('coupons')
+                .delete()
+                .eq('id', id);
+
+            if (couponsError) {
+                console.error('Error deleting coupons:', couponsError);
+                throw couponsError;
+            }
+            console.log('Successfully deleted coupons for participant:', id);
+
+            // Note: Auth user deletion requires service role key, not available with anon key
+            // The auth user will become orphaned but won't affect app functionality
+            // In production, this should be handled by a server-side function with service role
+            if (phoneNumber) {
+                const authEmail = `${phoneNumber}@isgcon.com`;
+                console.log(`Note: Auth user ${authEmail} should be deleted via admin panel or server function`);
+            }
+
+            // Delete from participants table
+            const { error: participantError } = await supabase
                 .from('participants')
                 .delete()
                 .eq('id', id);
 
-            if (error) throw error;
+            if (participantError) {
+                console.error('Error deleting participant:', participantError);
+                throw participantError;
+            }
+            console.log('Successfully deleted participant:', id);
+
             await refreshStats();
             return true;
         } catch (error) {
-            console.error('Error deleting participant:', error);
+            console.error('Error deleting participant completely:', error);
             return false;
         } finally {
             setIsLoading(false);
         }
-    };
-
-    // Legacy participant functions for backward compatibility
+    };    // Legacy participant functions for backward compatibility
     const createParticipant = async (participantData: Omit<Participant, 'id'>): Promise<boolean> => {
         try {
             setIsLoading(true);
@@ -466,7 +619,48 @@ export const AdminProvider: React.FC<AdminProviderProps> = ({ children }) => {
         }
     };
 
+    // Exhibitor Employee management functions
+    const getExhibitorEmployees = async (): Promise<ExhibitorEmployeeAdmin[]> => {
+        setIsLoading(true);
+        try {
+            const { data, error } = await supabase
+                .from('exhibitor_employees')
+                .select(`
+                    *,
+                    exhibitor_companies(company_name)
+                `)
+                .order('created_at', { ascending: false });
+
+            if (error) throw error;
+
+            return (data || []).map(e => ({
+                id: e.id,
+                companyId: e.company_id,
+                companyName: e.exhibitor_companies?.company_name || '',
+                employeeId: e.id, // Use the actual employee ID from the database
+                employeeName: e.employee_name,
+                phoneNumber: e.employee_phone || '', // Use employee_phone from database
+                email: '', // Not available in database schema
+                department: '', // Not available in database schema
+                designation: '', // Not available in database schema
+                isActive: e.is_active || true,
+                createdAt: e.created_at,
+                updatedAt: e.updated_at
+            }));
+        } catch (error) {
+            console.error('Error getting exhibitor employees:', error);
+            return [];
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
     // Coupon management functions
+    const getMealSlotName = (mealSlotId: string): string => {
+        const mealSlot = MEAL_SLOTS.find(slot => slot.id === mealSlotId);
+        return mealSlot ? mealSlot.name : `Meal Slot ${mealSlotId}`;
+    };
+
     const getCoupons = async (filters?: CouponFilters): Promise<CouponAdmin[]> => {
         setIsLoading(true);
         try {
@@ -482,8 +676,8 @@ export const AdminProvider: React.FC<AdminProviderProps> = ({ children }) => {
                 .order('uniqueId', { ascending: false });
 
             if (filters?.status) {
-                // Note: the coupons table uses boolean status instead of string
-                const statusBool = filters.status === 'active' ? true : false;
+                // Updated logic: true = available, false = used
+                const statusBool = filters.status === 'available' ? true : false;
                 query = query.eq('status', statusBool);
             }
 
@@ -497,9 +691,9 @@ export const AdminProvider: React.FC<AdminProviderProps> = ({ children }) => {
                 participantName: c.participants?.name || '', // From joined participants table
                 participantPhone: c.participants?.phoneNumber || '', // From joined participants table
                 mealSlotId: c.mealSlotId,
-                mealSlotName: '', // Will need to join with meal_slots table later
-                familyMemberIndex: c.familyMemberIndex,
-                status: c.status ? 'active' : 'available', // Convert boolean to string
+                mealSlotName: getMealSlotName(c.mealSlotId), // Map meal slot ID to name
+                familyMemberIndex: c.familymemberindex || 0, // Use correct lowercase field name from DB
+                status: c.status ? 'available' : 'used', // true = available, false = used/claimed
                 couponedAt: c.couponedAt,
                 expiresAt: c.expiresAt,
                 createdAt: new Date().toISOString() // Not in schema, using current time
@@ -518,7 +712,7 @@ export const AdminProvider: React.FC<AdminProviderProps> = ({ children }) => {
             const { error } = await supabase
                 .from('coupons')
                 .update({
-                    status: false, // false = available
+                    status: true, // true = available (reset to unused state)
                     couponedAt: null,
                     expiresAt: null
                 })
@@ -540,11 +734,11 @@ export const AdminProvider: React.FC<AdminProviderProps> = ({ children }) => {
             const { error } = await supabase
                 .from('coupons')
                 .update({
-                    status: false, // false = available
+                    status: true, // true = available (reset to unused state)
                     couponedAt: null,
                     expiresAt: null
                 })
-                .eq('status', true); // Only reset active coupons
+                .eq('status', false); // Only reset used/claimed coupons
 
             if (error) throw error;
             await refreshStats();
@@ -563,7 +757,7 @@ export const AdminProvider: React.FC<AdminProviderProps> = ({ children }) => {
             const { error } = await supabase
                 .from('coupons')
                 .update({
-                    status: false, // false = available
+                    status: true, // true = available (reset to unused state)
                     couponedAt: null,
                     expiresAt: null
                 })
@@ -598,9 +792,9 @@ export const AdminProvider: React.FC<AdminProviderProps> = ({ children }) => {
                 companyId: c.company_id,
                 companyName: c.exhibitor_companies?.company_name,
                 employeeId: c.employee_id,
-                employeeName: c.employee_name,
-                mealSlotId: c.meal_slot_id,
-                mealSlotName: '', // Will need to join with meal_slots
+                employeeName: '', // No employee_name in schema - would need to join exhibitor_employees
+                mealSlotId: c.mealSlotId, // Use correct field name from schema
+                mealSlotName: getMealSlotName(c.mealSlotId), // Map meal slot ID to name
                 mealType: c.meal_type,
                 quantity: c.quantity,
                 status: c.status,
@@ -628,6 +822,66 @@ export const AdminProvider: React.FC<AdminProviderProps> = ({ children }) => {
             return true;
         } catch (error) {
             console.error('Error resetting meal claim:', error);
+            return false;
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const claimExhibitorMeal = async (
+        companyId: string,
+        mealSlotId: string,
+        mealType: 'lunch' | 'dinner',
+        employeeId: string,
+        quantity: number = 1
+    ): Promise<boolean> => {
+        setIsLoading(true);
+        try {
+            // Check if claim already exists for this company, meal slot and employee
+            const { data: existingClaim } = await supabase
+                .from('exhibitor_meal_claims')
+                .select('*')
+                .eq('company_id', companyId)
+                .eq('mealSlotId', mealSlotId)
+                .eq('meal_type', mealType)
+                .eq('employee_id', employeeId)
+                .maybeSingle();
+
+            if (existingClaim) {
+                // Update existing claim quantity
+                const newQuantity = (existingClaim.quantity || 0) + quantity;
+                const { error } = await supabase
+                    .from('exhibitor_meal_claims')
+                    .update({
+                        quantity: newQuantity,
+                        claimed_at: new Date().toISOString(),
+                        expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+                    })
+                    .eq('id', existingClaim.id);
+
+                if (error) throw error;
+            } else {
+                // Create new claim
+                const { error } = await supabase
+                    .from('exhibitor_meal_claims')
+                    .insert({
+                        company_id: companyId,
+                        employee_id: employeeId, // Associate with specific employee
+                        mealSlotId: mealSlotId,
+                        meal_type: mealType,
+                        quantity: quantity,
+                        status: false, // false = claimed
+                        claimed_at: new Date().toISOString(),
+                        expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+                    });
+
+                if (error) throw error;
+            }
+
+            await refreshStats();
+            return true;
+        } catch (error) {
+            console.error('Error claiming exhibitor meal:', error);
             return false;
         } finally {
             setIsLoading(false);
@@ -727,12 +981,14 @@ export const AdminProvider: React.FC<AdminProviderProps> = ({ children }) => {
         addExhibitor,
         updateExhibitor,
         deleteExhibitor,
+        getExhibitorEmployees,
         getCoupons,
         resetCoupon,
         resetAllCoupons,
         resetParticipantCoupons,
         getMealClaims,
         resetMealClaim,
+        claimExhibitorMeal,
 
         // Legacy interface properties for backward compatibility
         participants,

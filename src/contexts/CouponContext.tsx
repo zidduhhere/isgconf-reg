@@ -34,9 +34,38 @@ export const CouponProvider = ({ children, participant }: AuthProviderProps) => 
                 }
             }
 
-            // Then fetch fresh data from Supabase
-            const fetchedCoupons = await getCoupons();
-            setCoupons(fetchedCoupons);
+            // Only fetch from Supabase on initial load - subsequent updates will be handled locally
+            if (!coupons) {
+                console.log("Fetching fresh coupons from Supabase...");
+                const fetchedCoupons = await getCoupons();
+
+                // If we have local coupons, prioritize their claimed status
+                if (localCoupons.length > 0) {
+                    const participantLocalCoupons = localCoupons.filter(c => c.id === participant.id);
+                    const mergedCoupons = fetchedCoupons.map(fetchedCoupon => {
+                        const localMatch = participantLocalCoupons.find(localCoupon =>
+                            localCoupon.mealSlotId === fetchedCoupon.mealSlotId &&
+                            localCoupon.familyMemberIndex === fetchedCoupon.familyMemberIndex
+                        );
+
+                        // If local coupon has active/used status with timestamps, preserve it
+                        if (localMatch && (localMatch.status === 'active' || localMatch.status === 'used') && localMatch.couponedAt) {
+                            console.log(`Preserving local claimed coupon for ${fetchedCoupon.mealSlotId}-${fetchedCoupon.familyMemberIndex}`);
+                            return {
+                                ...fetchedCoupon,
+                                status: localMatch.status,
+                                couponedAt: localMatch.couponedAt,
+                                expiresAt: localMatch.expiresAt
+                            };
+                        }
+
+                        return fetchedCoupon;
+                    });
+                    setCoupons(mergedCoupons);
+                } else {
+                    setCoupons(fetchedCoupons);
+                }
+            }
         })()
     }, [participant.id]);
 
@@ -61,20 +90,40 @@ export const CouponProvider = ({ children, participant }: AuthProviderProps) => 
 
             // Process data before returning, prioritizing local timestamps if they exist
             const processedData = data.map((coupon) => {
-                const key = `${coupon.mealSlotId}-${coupon.familyMemberIndex || 0}`;
+                // Map database field names to expected interface
+                const familyMemberIndex = coupon.familymemberindex || 0; // Handle lowercase field name
+                const key = `${coupon.mealSlotId}-${familyMemberIndex}`;
                 const localCoupon = localCouponsMap.get(key);
 
-                // If we have local coupon with timestamps, use those
+                console.log(`Processing coupon ${coupon.mealSlotId}, familyMemberIndex: ${familyMemberIndex}`);
+                console.log(`Looking for local coupon with key: ${key}`);
+                console.log(`Found local coupon:`, localCoupon);
+
+                // If we have local coupon with any claimed status (active or used), preserve it completely
+                if (localCoupon && (localCoupon.status === 'active' || localCoupon.status === 'used') && localCoupon.couponedAt) {
+                    console.log(`Preserving local coupon status: ${localCoupon.status}`);
+                    return {
+                        ...coupon,
+                        status: localCoupon.status,
+                        familyMemberIndex: familyMemberIndex,
+                        uniqueId: `${coupon.id}-${coupon.mealSlotId}-${familyMemberIndex}`,
+                        couponedAt: localCoupon.couponedAt,
+                        expiresAt: localCoupon.expiresAt
+                    };
+                }
+
+                // If we have local coupon with timestamps, validate expiration
                 if (localCoupon && localCoupon.couponedAt && localCoupon.expiresAt) {
                     const now = new Date();
                     const expiresAt = new Date(localCoupon.expiresAt);
                     const isStillValid = now < expiresAt;
 
+                    console.log(`Local coupon with timestamps - isStillValid: ${isStillValid}`);
                     return {
                         ...coupon,
                         status: isStillValid ? 'active' : 'used',
-                        familyMemberIndex: coupon.familyMemberIndex || 0,
-                        uniqueId: `${coupon.id}-${coupon.mealSlotId}-${coupon.familyMemberIndex || 0}`,
+                        familyMemberIndex: familyMemberIndex,
+                        uniqueId: `${coupon.id}-${coupon.mealSlotId}-${familyMemberIndex}`,
                         couponedAt: localCoupon.couponedAt,
                         expiresAt: localCoupon.expiresAt
                     };
@@ -87,8 +136,8 @@ export const CouponProvider = ({ children, participant }: AuthProviderProps) => 
                     status: coupon?.status === true ? 'available' :
                         (coupon.couponedAt && new Date(coupon.couponedAt) > new Date(Date.now() - 15 * 60 * 1000)) ?
                             'active' : 'used',
-                    familyMemberIndex: coupon.familyMemberIndex || 0,
-                    uniqueId: `${coupon.id}-${coupon.mealSlotId}-${coupon.familyMemberIndex || 0}`
+                    familyMemberIndex: familyMemberIndex,
+                    uniqueId: `${coupon.id}-${coupon.mealSlotId}-${familyMemberIndex}`
                 };
             });
 
@@ -176,12 +225,17 @@ export const CouponProvider = ({ children, participant }: AuthProviderProps) => 
                     expiresAt: status === 'active' ? timestampsForSupabase.expiresAt : null
                 })
                 .eq('id', participant.id)
-                .eq('mealSlotId', mealSlotId)
+                .eq('mealSlotId', mealSlotId)  // Both use camelCase mealSlotId
 
             console.log(`Updated Supabase for mealSlotId ${mealSlotId}: status=${status === 'active' ? false : true}, couponedAt=${status === 'active' ? timestampsForSupabase.couponedAt : null}`);
 
             if (error) {
-                throw new Error(`Failed to update coupon: ${error.message}`);
+                console.error(`Failed to update coupon in database: ${error.message}`);
+                console.log("Continuing with localStorage-only operation...");
+                // Don't throw error - continue with localStorage operation
+                // throw new Error(`Failed to update coupon: ${error.message}`);
+            } else {
+                console.log("Successfully updated coupon in Supabase database");
             }
 
             // 5. Force a refresh of the coupon data to ensure UI is updated
@@ -290,10 +344,9 @@ export const CouponProvider = ({ children, participant }: AuthProviderProps) => 
     const getRemainingTime = (couponId: string, familyMemberIndex = 0): number | undefined => {
         // First check in the storage service for the most up-to-date expiration time
         try {
-
-            const remainingTime = gtR(couponId, participant.id, familyMemberIndex);
-            if (remainingTime > 0) {
-                return remainingTime * 1000; // Convert seconds to milliseconds
+            const remainingTimeInSeconds = gtR(couponId, participant.id, familyMemberIndex);
+            if (remainingTimeInSeconds > 0) {
+                return remainingTimeInSeconds; // Return seconds directly, as FamilyCouponCard expects seconds
             }
         } catch (error) {
             console.error("Error getting remaining time from storage:", error);
@@ -305,7 +358,7 @@ export const CouponProvider = ({ children, participant }: AuthProviderProps) => 
             const expiresAt = new Date(coupon.expiresAt).getTime();
             const now = Date.now();
             const diff = expiresAt - now;
-            return diff > 0 ? diff : 0;
+            return diff > 0 ? Math.floor(diff / 1000) : 0; // Convert milliseconds to seconds
         }
         return undefined;
     }

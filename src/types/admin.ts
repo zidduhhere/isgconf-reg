@@ -24,6 +24,8 @@ export interface ParticipantAdmin {
   name: string;
   familySize: number;
   isFam: boolean;
+  hospitalName?: string;
+  isFaculty?: boolean;
   createdAt: string;
   updatedAt: string;
   couponsCount: number;
@@ -40,6 +42,21 @@ export interface ExhibitorAdmin {
   dinnerAllocation: number;
   lunchUsed: number;
   dinnerUsed: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ExhibitorEmployeeAdmin {
+  id: string;
+  companyId: string;
+  companyName?: string;
+  employeeId: string;
+  employeeName: string;
+  phoneNumber: string;
+  email?: string;
+  department?: string;
+  designation?: string;
+  isActive: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -100,6 +117,9 @@ export interface AdminContextType {
   updateExhibitor: (id: string, data: Partial<ExhibitorAdmin>) => Promise<boolean>;
   deleteExhibitor: (id: string) => Promise<boolean>;
   
+  // Exhibitor Employees
+  getExhibitorEmployees: () => Promise<ExhibitorEmployeeAdmin[]>;
+  
   // Coupons
   getCoupons: (filters?: CouponFilters) => Promise<CouponAdmin[]>;
   resetCoupon: (couponId: string) => Promise<boolean>;
@@ -109,6 +129,7 @@ export interface AdminContextType {
   // Meal Claims
   getMealClaims: () => Promise<MealClaimAdmin[]>;
   resetMealClaim: (claimId: string) => Promise<boolean>;
+  claimExhibitorMeal: (companyId: string, mealSlotId: string, mealType: 'lunch' | 'dinner', employeeId: string, quantity?: number) => Promise<boolean>;
 
   // Legacy interface properties for backward compatibility
   participants?: any[];

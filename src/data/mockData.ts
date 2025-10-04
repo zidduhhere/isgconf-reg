@@ -1,7 +1,7 @@
 import { MealSlot } from "../types";
 
 // Event dates - adjust these for your actual event
-const today = new Date(2025, 9, 3); //
+const today = new Date(2025, 9, 5); //
 const eventDay1 = new Date(
   today.getFullYear(),
   today.getMonth(),
@@ -20,7 +20,7 @@ export const MEAL_SLOTS: MealSlot[] = [
     day: 1,
     type: "lunch",
     startTime: "12:00",
-    endTime: "14:00",
+    endTime: "14:30",
     eventDate: eventDay1.toISOString().split("T")[0],
   },
   {
@@ -28,7 +28,7 @@ export const MEAL_SLOTS: MealSlot[] = [
     name: "GALA DINNER - DAY 1",
     day: 1,
     type: "dinner",
-    startTime: "14:00",
+    startTime: "20:00",
     endTime: "24:00",
     eventDate: eventDay1.toISOString().split("T")[0],
   },
@@ -38,7 +38,7 @@ export const MEAL_SLOTS: MealSlot[] = [
     day: 2,
     type: "lunch",
     startTime: "12:00",
-    endTime: "14:00",
+    endTime: "14:30",
     eventDate: eventDay2.toISOString().split("T")[0],
   }
 ];

@@ -1,22 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAdmin } from '../../contexts/AdminContext';
+import { getMealSlots } from '../../services/storageService';
 import {
     Users,
     Building2,
     Ticket,
     UtensilsCrossed,
     BarChart3,
-    Settings,
     LogOut,
     UserPlus,
-    Edit,
     Trash2,
     RefreshCw,
     Search,
-    Download,
-    Upload,
-    Eye,
     RotateCcw,
     Crown,
     Award,
@@ -25,37 +21,37 @@ import {
     AlertCircle,
     Shield
 } from 'lucide-react';
-import { ParticipantAdmin, ExhibitorAdmin, CouponAdmin, MealClaimAdmin } from '../../types/admin';
+import { ParticipantAdmin, ExhibitorAdmin, ExhibitorEmployeeAdmin, CouponAdmin, MealClaimAdmin } from '../../types/admin';
 
-type TabType = 'overview' | 'participants' | 'exhibitors' | 'coupons' | 'claims' | 'analytics';
+type TabType = 'overview' | 'participants' | 'exhibitors' | 'employees' | 'coupons' | 'claims' | 'analytics';
 
 export const AdminDashboardNew: React.FC = () => {
     const {
         currentAdmin,
         stats,
-        isLoading,
         logout,
         refreshStats,
         getParticipants,
         addParticipant,
-        updateParticipant,
         deleteParticipant,
         getExhibitors,
         addExhibitor,
-        updateExhibitor,
         deleteExhibitor,
+        getExhibitorEmployees,
         getCoupons,
         resetCoupon,
         resetAllCoupons,
         resetParticipantCoupons,
         getMealClaims,
-        resetMealClaim
+        resetMealClaim,
+        claimExhibitorMeal
     } = useAdmin();
 
     const navigate = useNavigate();
     const [activeTab, setActiveTab] = useState<TabType>('overview');
     const [participants, setParticipants] = useState<ParticipantAdmin[]>([]);
     const [exhibitors, setExhibitors] = useState<ExhibitorAdmin[]>([]);
+    const [employees, setEmployees] = useState<ExhibitorEmployeeAdmin[]>([]);
     const [coupons, setCoupons] = useState<CouponAdmin[]>([]);
     const [mealClaims, setMealClaims] = useState<MealClaimAdmin[]>([]);
     const [searchTerm, setSearchTerm] = useState('');
@@ -64,8 +60,6 @@ export const AdminDashboardNew: React.FC = () => {
     // Modal states
     const [showAddParticipant, setShowAddParticipant] = useState(false);
     const [showAddExhibitor, setShowAddExhibitor] = useState(false);
-    const [editingParticipant, setEditingParticipant] = useState<ParticipantAdmin | null>(null);
-    const [editingExhibitor, setEditingExhibitor] = useState<ExhibitorAdmin | null>(null);
 
     // Form states
     const [participantForm, setParticipantForm] = useState({
@@ -80,6 +74,20 @@ export const AdminDashboardNew: React.FC = () => {
         plan: 'Silver' as 'Diamond' | 'Platinum' | 'Gold' | 'Silver'
     });
 
+    // Manual claim form state
+    const [manualClaimForm, setManualClaimForm] = useState({
+        companyId: '',
+        mealSlotId: '',
+        mealType: '',
+        employeeId: '',
+        quantity: 1
+    });
+
+    // Data for dropdowns
+    const [companies, setCompanies] = useState<{ id: string; name: string }[]>([]);
+    const [mealSlots, setMealSlots] = useState<{ id: string; name: string; meal_type: string }[]>([]);
+    const [companyEmployees, setCompanyEmployees] = useState<{ id: string; name: string; phone: string }[]>([]);
+
     useEffect(() => {
         if (!currentAdmin) {
             navigate('/admin/login');
@@ -91,17 +99,35 @@ export const AdminDashboardNew: React.FC = () => {
     const loadData = async () => {
         setIsRefreshing(true);
         try {
-            const [participantsData, exhibitorsData, couponsData, claimsData] = await Promise.all([
+            const [participantsData, exhibitorsData, employeesData, couponsData, claimsData] = await Promise.all([
                 getParticipants(),
                 getExhibitors(),
+                getExhibitorEmployees(),
                 getCoupons(),
                 getMealClaims()
             ]);
 
             setParticipants(participantsData);
             setExhibitors(exhibitorsData);
+            setEmployees(employeesData);
             setCoupons(couponsData);
             setMealClaims(claimsData);
+
+            // Load data for manual claim form
+            const companiesData = exhibitorsData.map(e => ({
+                id: e.companyId,
+                name: e.companyName
+            }));
+            setCompanies(companiesData);
+
+            const mealSlotsData = getMealSlots().map(slot => ({
+                id: slot.id,
+                name: slot.name,
+                meal_type: slot.type
+            }));
+            console.log('Meal slots loaded:', mealSlotsData);
+            setMealSlots(mealSlotsData);
+
             await refreshStats();
         } catch (error) {
             console.error('Error loading data:', error);
@@ -119,6 +145,7 @@ export const AdminDashboardNew: React.FC = () => {
         { id: 'overview' as TabType, name: 'Overview', icon: BarChart3, count: null },
         { id: 'participants' as TabType, name: 'Participants', icon: Users, count: stats?.totalParticipants },
         { id: 'exhibitors' as TabType, name: 'Exhibitors', icon: Building2, count: stats?.totalExhibitors },
+        { id: 'employees' as TabType, name: 'Employees', icon: UserPlus, count: employees.length },
         { id: 'coupons' as TabType, name: 'Coupons', icon: Ticket, count: stats?.totalCoupons },
         { id: 'claims' as TabType, name: 'Meal Claims', icon: UtensilsCrossed, count: stats?.totalMealClaims },
         { id: 'analytics' as TabType, name: 'Analytics', icon: BarChart3, count: null },
@@ -165,7 +192,7 @@ export const AdminDashboardNew: React.FC = () => {
     };
 
     const handleDeleteParticipant = async (id: string) => {
-        if (window.confirm('Are you sure you want to delete this participant? This will also delete all their coupons.')) {
+        if (window.confirm('Are you sure you want to delete this participant?\n\nThis will permanently remove:\n• Participant record from database\n• All associated coupons\n\nNote: Authentication account will remain but become inactive.\nThis action cannot be undone.')) {
             const success = await deleteParticipant(id);
             if (success) {
                 loadData();
@@ -188,6 +215,72 @@ export const AdminDashboardNew: React.FC = () => {
             if (success) {
                 loadData();
             }
+        }
+    };
+
+    const handleManualClaim = async () => {
+        if (!manualClaimForm.companyId || !manualClaimForm.employeeId || !manualClaimForm.mealSlotId || !manualClaimForm.mealType || manualClaimForm.quantity < 1) {
+            alert('Please fill in all required fields');
+            return;
+        }
+
+        try {
+            const success = await claimExhibitorMeal(
+                manualClaimForm.companyId,
+                manualClaimForm.mealSlotId,
+                manualClaimForm.mealType as 'lunch' | 'dinner',
+                manualClaimForm.employeeId,
+                manualClaimForm.quantity
+            );
+
+            if (success) {
+                // Reset form
+                setManualClaimForm({
+                    companyId: '',
+                    mealSlotId: '',
+                    mealType: '',
+                    employeeId: '',
+                    quantity: 1
+                });
+                setCompanyEmployees([]);
+                // Reload data to show updated claims
+                loadData();
+                alert('Meal claimed successfully!');
+            } else {
+                alert('Failed to claim meal. Please try again.');
+            }
+        } catch (error) {
+            console.error('Error claiming meal:', error);
+            alert('Error claiming meal. Please try again.');
+        }
+    };
+
+    const loadEmployeesForCompany = async (companyId: string) => {
+        if (!companyId) {
+            setCompanyEmployees([]);
+            return;
+        }
+
+        try {
+            // Find the company UUID from the company_id
+            const company = companies.find(c => c.id === companyId);
+            if (!company) return;
+
+            // Get the exhibitor record to find the UUID
+            const exhibitor = exhibitors.find(e => e.companyId === companyId);
+            if (!exhibitor) return;
+
+            // Load employees for this company using the exhibitor id (which is the UUID)
+            const companyEmployees = employees.filter(emp => emp.companyId === exhibitor.id);
+
+            setCompanyEmployees(companyEmployees.map(emp => ({
+                id: emp.id,
+                name: emp.employeeName,
+                phone: emp.phoneNumber || ''
+            })));
+        } catch (error) {
+            console.error('Error loading employees:', error);
+            setCompanyEmployees([]);
         }
     };
 
@@ -384,6 +477,9 @@ export const AdminDashboardNew: React.FC = () => {
                                     Family Size
                                 </th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Faculty
+                                </th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                     Coupons
                                 </th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -418,6 +514,12 @@ export const AdminDashboardNew: React.FC = () => {
                                                 {participant.familySize} {participant.isFam ? 'Family' : 'Individual'}
                                             </span>
                                         </td>
+                                        <td className="px-6 py-4 whitespace-nowrap">
+                                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${participant.isFaculty ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800'
+                                                }`}>
+                                                {participant.isFaculty ? 'Faculty' : 'Student'}
+                                            </span>
+                                        </td>
                                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                                             <div className="flex items-center space-x-2">
                                                 <span className="text-green-600">{participant.activeCouponsCount} Active</span>
@@ -427,12 +529,6 @@ export const AdminDashboardNew: React.FC = () => {
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                                             <div className="flex items-center space-x-2">
-                                                <button
-                                                    onClick={() => setEditingParticipant(participant)}
-                                                    className="text-blue-600 hover:text-blue-900"
-                                                >
-                                                    <Edit className="h-4 w-4" />
-                                                </button>
                                                 <button
                                                     onClick={() => resetParticipantCoupons(participant.id)}
                                                     className="text-orange-600 hover:text-orange-900"
@@ -534,12 +630,6 @@ export const AdminDashboardNew: React.FC = () => {
                                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                                         <div className="flex items-center space-x-2">
                                             <button
-                                                onClick={() => setEditingExhibitor(exhibitor)}
-                                                className="text-blue-600 hover:text-blue-900"
-                                            >
-                                                <Edit className="h-4 w-4" />
-                                            </button>
-                                            <button
                                                 onClick={() => handleDeleteExhibitor(exhibitor.id)}
                                                 className="text-red-600 hover:text-red-900"
                                             >
@@ -556,101 +646,64 @@ export const AdminDashboardNew: React.FC = () => {
         </div>
     );
 
-    const renderCoupons = () => (
+    const renderEmployees = () => (
         <div className="space-y-6">
+            {/* Employees Header */}
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
                 <div>
-                    <h2 className="text-xl font-semibold text-gray-900">Coupons Management</h2>
-                    <p className="text-sm text-gray-600">View and manage participant meal coupons</p>
-                </div>
-                <div className="mt-4 sm:mt-0 flex space-x-3">
-                    <button
-                        onClick={handleResetAllCoupons}
-                        className="inline-flex items-center px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 transition-colors"
-                    >
-                        <RotateCcw className="h-4 w-4 mr-2" />
-                        Reset All Coupons
-                    </button>
+                    <h2 className="text-xl font-semibold text-gray-900">Exhibitor Employees</h2>
+                    <p className="text-sm text-gray-600">View all exhibitor company employees</p>
                 </div>
             </div>
 
-            {/* Coupons Stats */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-                    <div className="text-sm font-medium text-gray-500">Total Coupons</div>
-                    <div className="text-2xl font-semibold text-gray-900">{stats?.totalCoupons || 0}</div>
-                </div>
-                <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-                    <div className="text-sm font-medium text-gray-500">Available</div>
-                    <div className="text-2xl font-semibold text-green-600">{stats?.activeCoupons || 0}</div>
-                </div>
-                <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-                    <div className="text-sm font-medium text-gray-500">Claimed</div>
-                    <div className="text-2xl font-semibold text-orange-600">{stats?.claimedCoupons || 0}</div>
-                </div>
-                <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-                    <div className="text-sm font-medium text-gray-500">Expired</div>
-                    <div className="text-2xl font-semibold text-red-600">{stats?.expiredCoupons || 0}</div>
-                </div>
-            </div>
-
-            {/* Coupons Table */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+            {/* Employees Table */}
+            <div className="bg-white shadow-sm rounded-lg overflow-hidden">
                 <div className="overflow-x-auto">
                     <table className="min-w-full divide-y divide-gray-200">
                         <thead className="bg-gray-50">
                             <tr>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    Participant
+                                    Employee
                                 </th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    Meal Slot
+                                    Company
                                 </th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    Family Member
+                                    Mobile Number
                                 </th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                     Status
                                 </th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    Actions
-                                </th>
                             </tr>
                         </thead>
                         <tbody className="bg-white divide-y divide-gray-200">
-                            {coupons.slice(0, 50).map((coupon) => (
-                                <tr key={coupon.uniqueId} className="hover:bg-gray-50">
+                            {employees.map((employee) => (
+                                <tr key={employee.id} className="hover:bg-gray-50">
                                     <td className="px-6 py-4 whitespace-nowrap">
-                                        <div>
-                                            <div className="text-sm font-medium text-gray-900">
-                                                {coupon.participantName}
+                                        <div className="flex items-center">
+                                            <div className="flex-shrink-0 h-10 w-10">
+                                                <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center">
+                                                    <UserPlus className="h-5 w-5 text-blue-600" />
+                                                </div>
                                             </div>
-                                            <div className="text-sm text-gray-500">
-                                                {coupon.participantPhone}
+                                            <div className="ml-4">
+                                                <div className="text-sm font-medium text-gray-900">{employee.employeeName}</div>
+                                                <div className="text-sm text-gray-500">ID: {employee.employeeId}</div>
                                             </div>
                                         </div>
                                     </td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                        {coupon.mealSlotName}
-                                    </td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                        {coupon.familyMemberIndex === 0 ? 'Main' : `Family ${coupon.familyMemberIndex}`}
+                                    <td className="px-6 py-4 whitespace-nowrap">
+                                        <div className="text-sm text-gray-900">{employee.companyName}</div>
+                                        <div className="text-sm text-gray-500">{employee.companyId}</div>
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap">
-                                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${coupon.status === 'available' ? 'bg-green-100 text-green-800' :
-                                            coupon.status === 'used' ? 'bg-red-100 text-red-800' :
-                                                'bg-yellow-100 text-yellow-800'
-                                            }`}>
-                                            {coupon.status}
-                                        </span>
+                                        <div className="text-sm text-gray-900">{employee.phoneNumber || 'N/A'}</div>
                                     </td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                        <button
-                                            onClick={() => resetCoupon(coupon.uniqueId)}
-                                            className="text-orange-600 hover:text-orange-900"
-                                        >
-                                            <RotateCcw className="h-4 w-4" />
-                                        </button>
+                                    <td className="px-6 py-4 whitespace-nowrap">
+                                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${employee.isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                                            }`}>
+                                            {employee.isActive ? 'Active' : 'Inactive'}
+                                        </span>
                                     </td>
                                 </tr>
                             ))}
@@ -661,12 +714,249 @@ export const AdminDashboardNew: React.FC = () => {
         </div>
     );
 
+    const renderCoupons = () => {
+        // Filter coupons based on search term
+        const filteredCoupons = coupons.filter(coupon =>
+            (coupon.participantName?.toLowerCase().includes(searchTerm.toLowerCase()) || false) ||
+            (coupon.participantPhone?.includes(searchTerm) || false) ||
+            (coupon.mealSlotName?.toLowerCase().includes(searchTerm.toLowerCase()) || false) ||
+            coupon.status.toLowerCase().includes(searchTerm.toLowerCase())
+        );
+
+        return (
+            <div className="space-y-6">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                        <h2 className="text-xl font-semibold text-gray-900">Coupons Management</h2>
+                        <p className="text-sm text-gray-600">View and manage participant meal coupons ({filteredCoupons.length} of {coupons.length} coupons)</p>
+                    </div>
+                    <div className="mt-4 sm:mt-0 flex space-x-3">
+                        <button
+                            onClick={handleResetAllCoupons}
+                            className="inline-flex items-center px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 transition-colors"
+                        >
+                            <RotateCcw className="h-4 w-4 mr-2" />
+                            Reset All Coupons
+                        </button>
+                    </div>
+                </div>
+
+                {/* Search Bar */}
+                <div className="relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                    <input
+                        type="text"
+                        placeholder="Search by participant name, phone, meal slot, or status..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    />
+                </div>
+
+                {/* Coupons Stats */}
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+                        <div className="text-sm font-medium text-gray-500">Total Coupons</div>
+                        <div className="text-2xl font-semibold text-gray-900">{stats?.totalCoupons || 0}</div>
+                    </div>
+                    <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+                        <div className="text-sm font-medium text-gray-500">Available</div>
+                        <div className="text-2xl font-semibold text-green-600">{stats?.activeCoupons || 0}</div>
+                    </div>
+                    <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+                        <div className="text-sm font-medium text-gray-500">Claimed</div>
+                        <div className="text-2xl font-semibold text-orange-600">{stats?.claimedCoupons || 0}</div>
+                    </div>
+                    <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+                        <div className="text-sm font-medium text-gray-500">Expired</div>
+                        <div className="text-2xl font-semibold text-red-600">{stats?.expiredCoupons || 0}</div>
+                    </div>
+                </div>
+
+                {/* Coupons Table */}
+                <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                    <div className="overflow-x-auto">
+                        <table className="min-w-full divide-y divide-gray-200">
+                            <thead className="bg-gray-50">
+                                <tr>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        Participant
+                                    </th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        Meal Slot
+                                    </th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        Family Member
+                                    </th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        Status
+                                    </th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        Actions
+                                    </th>
+                                </tr>
+                            </thead>
+                            <tbody className="bg-white divide-y divide-gray-200">
+                                {filteredCoupons.length === 0 ? (
+                                    <tr>
+                                        <td colSpan={5} className="px-6 py-8 text-center text-gray-500">
+                                            {searchTerm ? 'No coupons found matching your search.' : 'No coupons available.'}
+                                        </td>
+                                    </tr>
+                                ) : (
+                                    filteredCoupons.map((coupon) => (
+                                        <tr key={coupon.uniqueId} className="hover:bg-gray-50">
+                                            <td className="px-6 py-4 whitespace-nowrap">
+                                                <div>
+                                                    <div className="text-sm font-medium text-gray-900">
+                                                        {coupon.participantName}
+                                                    </div>
+                                                    <div className="text-sm text-gray-500">
+                                                        {coupon.participantPhone}
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                                {coupon.mealSlotName}
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                                {coupon.familyMemberIndex === 0 ? 'Main' : `Family ${coupon.familyMemberIndex}`}
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap">
+                                                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${coupon.status === 'available' ? 'bg-green-100 text-green-800' :
+                                                    coupon.status === 'used' ? 'bg-red-100 text-red-800' :
+                                                        coupon.status === 'active' ? 'bg-yellow-100 text-yellow-800' :
+                                                            'bg-gray-100 text-gray-800'
+                                                    }`}>
+                                                    {coupon.status}
+                                                </span>
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                                <button
+                                                    onClick={() => resetCoupon(coupon.uniqueId)}
+                                                    className="text-orange-600 hover:text-orange-900 mr-3"
+                                                    title="Reset coupon to available"
+                                                >
+                                                    <RotateCcw className="h-4 w-4" />
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    ))
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        );
+    };
+
     const renderMealClaims = () => (
         <div className="space-y-6">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
                 <div>
                     <h2 className="text-xl font-semibold text-gray-900">Meal Claims Management</h2>
                     <p className="text-sm text-gray-600">View and manage exhibitor meal claims</p>
+                </div>
+            </div>
+
+            {/* Manual Claim Form */}
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                <h3 className="text-lg font-medium text-gray-900 mb-4">Manual Claim Entry</h3>
+                <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Company
+                        </label>
+                        <select
+                            value={manualClaimForm.companyId || ''}
+                            onChange={(e) => {
+                                setManualClaimForm(prev => ({ ...prev, companyId: e.target.value, employeeId: '' }));
+                                loadEmployeesForCompany(e.target.value);
+                            }}
+                            className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                        >
+                            <option value="">Select Company</option>
+                            {companies.map(company => (
+                                <option key={company.id} value={company.id}>
+                                    {company.name}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Employee
+                        </label>
+                        <select
+                            value={manualClaimForm.employeeId || ''}
+                            onChange={(e) => setManualClaimForm(prev => ({ ...prev, employeeId: e.target.value }))}
+                            disabled={!manualClaimForm.companyId || companyEmployees.length === 0}
+                            className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 disabled:bg-gray-100"
+                        >
+                            <option value="">Select Employee</option>
+                            {companyEmployees.map(employee => (
+                                <option key={employee.id} value={employee.id}>
+                                    {employee.name} {employee.phone && `(${employee.phone})`}
+                                </option>
+                            ))}
+                        </select>
+                        {manualClaimForm.companyId && companyEmployees.length === 0 && (
+                            <p className="text-xs text-amber-600 mt-1">No employees found for this company</p>
+                        )}
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Meal Slot
+                        </label>
+                        <select
+                            value={manualClaimForm.mealSlotId || ''}
+                            onChange={(e) => setManualClaimForm(prev => ({ ...prev, mealSlotId: e.target.value }))}
+                            className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                        >
+                            <option value="">Select Meal Slot</option>
+                            {mealSlots.map(slot => (
+                                <option key={slot.id} value={slot.id}>
+                                    {slot.name} - {slot.meal_type}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Meal Type
+                        </label>
+                        <select
+                            value={manualClaimForm.mealType || ''}
+                            onChange={(e) => setManualClaimForm(prev => ({ ...prev, mealType: e.target.value }))}
+                            className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                        >
+                            <option value="">Select Type</option>
+                            <option value="lunch">Lunch</option>
+                            <option value="dinner">Dinner</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Quantity
+                        </label>
+                        <input
+                            type="number"
+                            min="1"
+                            value={manualClaimForm.quantity}
+                            onChange={(e) => setManualClaimForm(prev => ({ ...prev, quantity: parseInt(e.target.value) || 1 }))}
+                            className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                        />
+                    </div>
+                    <div className="flex items-end">
+                        <button
+                            onClick={handleManualClaim}
+                            disabled={!manualClaimForm.companyId || !manualClaimForm.employeeId || !manualClaimForm.mealSlotId || !manualClaimForm.mealType || manualClaimForm.quantity < 1}
+                            className="w-full px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+                        >
+                            Claim Meal
+                        </button>
+                    </div>
                 </div>
             </div>
 
@@ -849,6 +1139,7 @@ export const AdminDashboardNew: React.FC = () => {
                 {activeTab === 'overview' && renderOverview()}
                 {activeTab === 'participants' && renderParticipants()}
                 {activeTab === 'exhibitors' && renderExhibitors()}
+                {activeTab === 'employees' && renderEmployees()}
                 {activeTab === 'coupons' && renderCoupons()}
                 {activeTab === 'claims' && renderMealClaims()}
                 {activeTab === 'analytics' && renderAnalytics()}

@@ -223,13 +223,22 @@ export const FamilyCouponCard: React.FC<FamilyCouponCardProps> = ({
 
                         {coupon.status === 'active' && localTimeRemaining > 0 && (
                             <div className="w-full">
-                                <div className="w-full bg-white bg-opacity-30 rounded-full h-3 mb-1">
+                                <div className="w-full bg-white bg-opacity-30 rounded-full h-3 mb-2">
                                     <div
-                                        className="bg-white h-3 rounded-full transition-all duration-1000 shadow-sm"
-                                        style={{ width: `${(localTimeRemaining / 900) * 100}%` }}
+                                        className={`h-3 rounded-full transition-all duration-1000 shadow-sm ${localTimeRemaining < 300 ? 'bg-red-400 animate-pulse' : 'bg-white'
+                                            }`}
+                                        style={{ width: `${Math.max(0, (localTimeRemaining / 900) * 100)}%` }}
                                     ></div>
                                 </div>
-                                <p className="text-xs text-white opacity-90">Time remaining</p>
+                                <div className="flex justify-between items-center">
+                                    <p className={`text-xs font-medium ${localTimeRemaining < 300 ? 'text-red-100 animate-pulse' : 'text-white opacity-90'
+                                        }`}>
+                                        {localTimeRemaining < 300 ? '⚠️ EXPIRES SOON!' : 'Valid for 15 minutes'}
+                                    </p>
+                                    <p className="text-xs text-white font-bold">
+                                        {formatTimeRemaining(localTimeRemaining)}
+                                    </p>
+                                </div>
                             </div>
                         )}
                     </div>
@@ -267,15 +276,19 @@ export const FamilyCouponCard: React.FC<FamilyCouponCardProps> = ({
                                 <h5 className="font-semibold text-purple-900 mb-2">Family Requirements:</h5>
                                 <ul className="text-sm text-purple-700 text-left space-y-1">
                                     <li>• All {participant.familySize} family members must be present</li>
+                                    <li>• <strong>Coupon expires automatically after 15 minutes</strong></li>
                                     <li>• Show this coupon to the food counter staff</li>
                                     <li>• Meals will be served for all family members together</li>
                                 </ul>
                             </div>
 
                             {/* Warning */}
-                            <p className="text-sm text-gray-600 mb-6">
-                                Please confirm that all family members are present before couponing this coupon.
-                            </p>
+                            <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-6">
+                                <p className="text-sm text-amber-800 font-medium">
+                                    ⏰ <strong>Important:</strong> This coupon will be valid for exactly <strong>15 minutes</strong> once claimed.
+                                    Please ensure all family members are ready before claiming.
+                                </p>
+                            </div>
 
                             {/* Action Buttons */}
                             <div className="flex space-x-3">

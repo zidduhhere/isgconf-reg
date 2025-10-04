@@ -137,7 +137,7 @@ export const Dashboard: React.FC = () => {
                       <div className="grid grid-cols-1 gap-4">
                         {mealSlots.map((slot) => {
                           const familyCoupon = getClaimForSlot(slot.id, familyMemberIndex);
-                          const familyTimeRemaining = getRemainingTime(`${slot.id}-family-${familyMemberIndex}`, familyMemberIndex);
+                          const familyTimeRemaining = getRemainingTime(slot.id, familyMemberIndex);
                           console.log(`Family Member ${familyMemberIndex}, Meal Slot ${slot.id}, Coupon:`, familyCoupon);
                           return (
                             <FamilyCouponCard
@@ -150,8 +150,8 @@ export const Dashboard: React.FC = () => {
                                 familyMemberIndex: familyMemberIndex,
                                 status: 'available'
                               }}
-                              onClaim={(mealSlotId) => {
-                                updateCoupon(mealSlotId, 'active', familyMemberIndex);
+                              onClaim={async (mealSlotId) => {
+                                await updateCoupon(mealSlotId, 'active', familyMemberIndex);
                               }}
                               timeRemaining={familyTimeRemaining}
                               participant={currentUser}

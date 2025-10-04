@@ -56,7 +56,7 @@ export interface ExhibitorContextType {
   
   // Meal claim functions
   claimMeal: (employeeId: string, mealSlotId: string, mealType: 'lunch' | 'dinner') => Promise<boolean>;
-  claimMealBulk: (mealSlotId: string, mealType: 'lunch' | 'dinner', quantity: number) => Promise<boolean>;
+  claimMealBulk: (mealSlotId: string, mealType: 'lunch' | 'dinner', quantity: number, employeeId: string) => Promise<boolean>;
   getMealClaims: () => Promise<ExhibitorMealClaim[]>;
   getAvailableAllocations: () => { lunch: number; dinner: number };
   
