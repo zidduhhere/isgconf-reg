@@ -217,9 +217,14 @@ export const AdminProvider: React.FC<AdminProviderProps> = ({ children }) => {
             // Handle meal claims
             if (mealClaimsResult.status === 'fulfilled' && mealClaimsResult.value.data) {
                 const mealClaims = mealClaimsResult.value.data || [];
-                totalMealClaims = mealClaims.length;
-                lunchClaims = mealClaims.filter(c => c.meal_type === 'lunch').length;
-                dinnerClaims = mealClaims.filter(c => c.meal_type === 'dinner').length;
+                // Sum quantities instead of counting claims
+                totalMealClaims = mealClaims.reduce((sum, claim) => sum + (claim.quantity || 1), 0);
+                lunchClaims = mealClaims
+                    .filter(c => c.meal_type === 'lunch')
+                    .reduce((sum, claim) => sum + (claim.quantity || 1), 0);
+                dinnerClaims = mealClaims
+                    .filter(c => c.meal_type === 'dinner')
+                    .reduce((sum, claim) => sum + (claim.quantity || 1), 0);
                 console.log('AdminContext: Meal claims stats:', { totalMealClaims, lunchClaims, dinnerClaims });
             } else if (mealClaimsResult.status === 'rejected') {
                 console.error('AdminContext: Meal claims query failed:', mealClaimsResult.reason);

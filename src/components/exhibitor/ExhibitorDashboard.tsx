@@ -54,8 +54,10 @@ const ExhibitorDashboard: React.FC = () => {
         currentCompany,
         employees,
         logout,
-        getAvailableAllocations,
         claimMealBulk,
+        getAvailableAllocations,
+        getSlotAvailability,
+        getClaimedMeal,
         refreshData
     } = useExhibitor();
 
@@ -79,12 +81,28 @@ const ExhibitorDashboard: React.FC = () => {
     }, [employees, selectedEmployeeId]);
 
     const handleClaimMeal = async (mealSlotId: string, mealType: 'lunch' | 'dinner', quantity: number) => {
-        if (!currentCompany || isClaimingMeal || !selectedEmployeeId) return;
+        if (!currentCompany || isClaimingMeal || !selectedEmployeeId) {
+            if (!selectedEmployeeId) {
+                alert('Please select an employee first.');
+            }
+            return;
+        }
 
-        // Check if we have enough allocation
-        const available = mealType === 'lunch' ? allocations.lunch : allocations.dinner;
-        if (quantity > available) {
-            alert(`Not enough ${mealType} allocation remaining. You have ${available} left.`);
+        // Check slot-specific availability
+        const slotAvailability = getSlotAvailability(mealSlotId, mealType);
+        if (!slotAvailability.isAvailable) {
+            alert(`This ${mealType} slot has already been claimed by your company or is no longer available.`);
+            return;
+        }
+
+        if (quantity > slotAvailability.maxQuantity) {
+            alert(`Not enough ${mealType} allocation remaining. You have ${slotAvailability.maxQuantity} ${mealType}(s) left in your plan.`);
+            return;
+        }
+
+        const selectedEmployee = employees.find(emp => emp.id === selectedEmployeeId);
+        if (!selectedEmployee) {
+            alert('Selected employee not found. Please refresh and try again.');
             return;
         }
 
@@ -95,10 +113,9 @@ const ExhibitorDashboard: React.FC = () => {
 
             if (success) {
                 await refreshData(); // Refresh to get updated counts
-                const selectedEmployee = employees.find(emp => emp.id === selectedEmployeeId);
-                alert(`Successfully claimed ${quantity} ${mealType}(s) for ${selectedEmployee?.employeeName} in ${mealSlotId}`);
+                alert(`Successfully claimed ${quantity} ${mealType}(s) for ${selectedEmployee.employeeName} - ${mealSlotId.replace('_', ' ')}`);
             } else {
-                alert('Failed to claim meal. Please try again.');
+                alert('Failed to claim meal. This slot may have already been claimed by your company or you may have exceeded your allocation limit.');
             }
         } catch (error) {
             console.error('Error claiming meal:', error);
@@ -149,7 +166,7 @@ const ExhibitorDashboard: React.FC = () => {
                     <div className="bg-white rounded-lg shadow p-6">
                         <div className="flex items-center justify-between">
                             <div>
-                                <p className="text-sm font-medium text-gray-600">Lunch Remaining</p>
+                                <p className="text-sm font-medium text-gray-600">Lunch Slots Available</p>
                                 <p className="text-2xl font-bold text-green-600">{allocations?.lunch || 0}</p>
                             </div>
                             <UtensilsCrossed className="h-8 w-8 text-green-600" />
@@ -159,7 +176,7 @@ const ExhibitorDashboard: React.FC = () => {
                     <div className="bg-white rounded-lg shadow p-6">
                         <div className="flex items-center justify-between">
                             <div>
-                                <p className="text-sm font-medium text-gray-600">Dinner Remaining</p>
+                                <p className="text-sm font-medium text-gray-600">Dinner Slots Available</p>
                                 <p className="text-2xl font-bold text-purple-600">{allocations?.dinner || 0}</p>
                             </div>
                             <Clock className="h-8 w-8 text-purple-600" />
@@ -229,16 +246,18 @@ const ExhibitorDashboard: React.FC = () => {
                     <div className="p-6 space-y-6">
                         {selectedEmployeeId ? (
                             MEAL_SLOTS.map((slot) => {
-                                const isAvailable = slot.type === 'lunch' ? allocations.lunch > 0 : allocations.dinner > 0;
-                                const maxQuantity = slot.type === 'lunch' ? allocations.lunch : allocations.dinner;
+                                const slotAvailability = getSlotAvailability(slot.id, slot.type);
+                                const claimedMealData = getClaimedMeal(slot.id);
                                 const isClaiming = isClaimingMeal === slot.id;
 
                                 return (
                                     <ExhibitorMealCard
                                         key={slot.id}
                                         mealSlot={slot}
-                                        isAvailable={isAvailable}
-                                        maxQuantity={maxQuantity}
+                                        isAvailable={slotAvailability.isAvailable}
+                                        maxQuantity={slotAvailability.maxQuantity}
+                                        isClaimed={claimedMealData.isClaimed}
+                                        claimedQuantity={claimedMealData.claimedQuantity}
                                         onClaim={(quantity: number) => handleClaimMeal(slot.id, slot.type, quantity)}
                                         isLoading={isClaiming}
                                     />

@@ -342,7 +342,7 @@ export const ExhibitorProvider: React.FC<{ children: React.ReactNode }> = ({ chi
                 .upsert({
                     company_id: currentCompany.id,
                     employee_id: employeeId,
-                    mealSlotId: mealSlotId, // Use camelCase as per database schema
+                    meal_slot_id: mealSlotId, // Use snake_case for database consistency
                     meal_type: mealType,
                     status: false, // false = claimed
                     claimed_at: new Date().toISOString(),
@@ -367,7 +367,7 @@ export const ExhibitorProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         id: dbClaim.id,
         companyId: dbClaim.company_id,
         employeeId: dbClaim.employee_id,
-        mealSlotId: dbClaim.mealSlotId, // Use camelCase as per database schema
+        mealSlotId: dbClaim.meal_slot_id || dbClaim.mealSlotId, // Handle both snake_case and camelCase
         mealType: dbClaim.meal_type,
         quantity: dbClaim.quantity || 1, // Use actual quantity from database, fallback to 1
         status: dbClaim.status,
@@ -424,27 +424,123 @@ export const ExhibitorProvider: React.FC<{ children: React.ReactNode }> = ({ chi
             return { lunch: 0, dinner: 0 };
         }
 
-        // Count actual claimed quantities from the meal claims data
-        const lunchClaimed = mealClaims
-            .filter(claim => claim.mealType === 'lunch' && claim.status === false)
-            .reduce((total, claim) => total + (claim.quantity || 1), 0);
+        // With independent slots, show the allocation per slot type
+        // Since slots are independent, each lunch slot can have full allocation
+        // Count how many lunch/dinner slots are available and show total possible claims
+        const lunchSlots = ['lunch_1', 'lunch_2']; // Define available lunch slots
+        const dinnerSlots = ['gala_1']; // Define available dinner slots
 
-        const dinnerClaimed = mealClaims
-            .filter(claim => claim.mealType === 'dinner' && claim.status === false)
-            .reduce((total, claim) => total + (claim.quantity || 1), 0);
+        // Count unclaimed lunch slots
+        const availableLunchSlots = lunchSlots.filter(slotId => {
+            const claim = mealClaims.find(claim =>
+                claim.mealSlotId === slotId &&
+                claim.companyId === currentCompany.id &&
+                claim.status === false
+            );
+            return !claim; // Slot is available if not claimed
+        }).length;
 
-        console.log('Available allocations calculation:', {
+        // Count unclaimed dinner slots  
+        const availableDinnerSlots = dinnerSlots.filter(slotId => {
+            const claim = mealClaims.find(claim =>
+                claim.mealSlotId === slotId &&
+                claim.companyId === currentCompany.id &&
+                claim.status === false
+            );
+            return !claim; // Slot is available if not claimed
+        }).length;
+
+        const totalPossibleLunch = availableLunchSlots * planAllocation.lunch;
+        const totalPossibleDinner = availableDinnerSlots * planAllocation.dinner;
+
+        console.log('Available allocations calculation (independent slots):', {
             plan: currentCompany.plan,
             planAllocation,
-            lunchClaimed,
-            dinnerClaimed,
-            availableLunch: Math.max(0, planAllocation.lunch - lunchClaimed),
-            availableDinner: Math.max(0, planAllocation.dinner - dinnerClaimed)
+            availableLunchSlots,
+            availableDinnerSlots,
+            totalPossibleLunch,
+            totalPossibleDinner
         });
 
         return {
-            lunch: Math.max(0, planAllocation.lunch - lunchClaimed),
-            dinner: Math.max(0, planAllocation.dinner - dinnerClaimed)
+            lunch: totalPossibleLunch,
+            dinner: totalPossibleDinner
+        };
+    }, [currentCompany, mealClaims]);
+
+    // Get availability for a specific meal slot
+    const getSlotAvailability = useCallback((mealSlotId: string, mealType: 'lunch' | 'dinner') => {
+        if (!currentCompany) return { isAvailable: false, maxQuantity: 0 };
+
+        const planAllocation = PLAN_ALLOCATIONS[currentCompany.plan as keyof typeof PLAN_ALLOCATIONS];
+        if (!planAllocation) {
+            return { isAvailable: false, maxQuantity: 0 };
+        }
+
+        // Check if this specific slot has been claimed by this company
+        const slotClaim = mealClaims.find(claim =>
+            claim.mealSlotId === mealSlotId &&
+            claim.companyId === currentCompany.id &&
+            claim.status === false
+        );
+
+        // If this company has already claimed this slot, it's not available for additional claims
+        if (slotClaim) {
+            return { isAvailable: false, maxQuantity: 0 };
+        }
+
+        // Treat each meal slot as independent - each slot gets the full allocation
+        // This means Day 1 lunch and Day 2 lunch are separate events with separate allocations
+        const totalAllocation = mealType === 'lunch' ? planAllocation.lunch : planAllocation.dinner;
+
+        console.log(`getSlotAvailability for ${mealSlotId}:`, {
+            mealType,
+            mealSlotId,
+            totalAllocation,
+            slotClaim: !!slotClaim,
+            note: 'Independent slot - each slot gets full allocation'
+        });
+
+        return {
+            isAvailable: totalAllocation > 0,
+            maxQuantity: totalAllocation
+        };
+    }, [currentCompany, mealClaims]);
+
+    // Get claimed meal info for a specific slot
+    const getClaimedMeal = useCallback((mealSlotId: string) => {
+        if (!currentCompany) return {
+            isClaimed: false,
+            claimedQuantity: 0,
+            claimedBy: null,
+            claimedAt: null
+        };
+
+        // Find ALL claims for this slot by this company and sum the quantities
+        const claimedMeals = mealClaims.filter(claim =>
+            claim.mealSlotId === mealSlotId &&
+            claim.companyId === currentCompany.id &&
+            claim.status === false
+        );
+
+        if (claimedMeals.length === 0) {
+            return {
+                isClaimed: false,
+                claimedQuantity: 0,
+                claimedBy: null,
+                claimedAt: null
+            };
+        }
+
+        // Sum all quantities for this slot
+        const totalQuantity = claimedMeals.reduce((total, claim) => total + (claim.quantity || 1), 0);
+        const firstClaim = claimedMeals[0]; // Use first claim for metadata
+
+        return {
+            isClaimed: true,
+            claimedQuantity: totalQuantity,
+            claimedBy: 'Company',
+            claimedAt: firstClaim.claimedAt || firstClaim.createdAt || null
         };
     }, [currentCompany, mealClaims]);    // New bulk claiming function for company-level meal claiming without specific employees
     const claimMealBulk = useCallback(async (
@@ -453,95 +549,89 @@ export const ExhibitorProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         quantity: number,
         employeeId: string
     ): Promise<boolean> => {
-        if (!currentCompany) return false;
+        if (!currentCompany) {
+            console.error('No current company found');
+            return false;
+        }
+
+        if (!employeeId) {
+            console.error('Employee ID is required');
+            return false;
+        }
+
+        if (quantity <= 0) {
+            console.error('Quantity must be greater than 0');
+            return false;
+        }
 
         try {
-            // Check allocation limits
-            const allocations = getAvailableAllocations();
-            const available = mealType === 'lunch' ? allocations.lunch : allocations.dinner;
+            // Use slot-specific availability check
+            const slotAvailability = getSlotAvailability(mealSlotId, mealType);
 
             console.log('claimMealBulk: Starting claim process', {
                 mealSlotId,
                 mealType,
                 quantity,
                 employeeId,
-                available,
-                allocations
+                slotAvailability
             });
 
-            if (quantity > available) {
-                console.error(`Not enough ${mealType} allocation. Requested: ${quantity}, Available: ${available}`);
+            if (!slotAvailability.isAvailable) {
+                console.error(`${mealType} slot ${mealSlotId} is not available for this company`);
                 return false;
             }
 
-            // Check if claim already exists for this meal slot and employee
+            if (quantity > slotAvailability.maxQuantity) {
+                console.error(`Not enough ${mealType} allocation. Requested: ${quantity}, Available: ${slotAvailability.maxQuantity}`);
+                return false;
+            }
+
+            // Check if claim already exists for this meal slot and company (regardless of employee)
             let existingClaim: any = null;
             try {
                 const { data } = await supabase
                     .from('exhibitor_meal_claims')
                     .select('*')
                     .eq('company_id', currentCompany.id)
-                    .eq('mealSlotId', mealSlotId) // Use camelCase as per database schema
+                    .eq('meal_slot_id', mealSlotId) // Use snake_case for database consistency
                     .eq('meal_type', mealType)
-                    .eq('employee_id', employeeId)
                     .maybeSingle(); // Use maybeSingle to get null if no record exists
 
                 existingClaim = data;
+
+                if (existingClaim) {
+                    console.error(`${mealType} slot ${mealSlotId} has already been claimed by this company`);
+                    return false;
+                }
             } catch (error) {
-                console.warn('Could not check for existing claims, proceeding with new claim');
-                existingClaim = null;
+                console.warn('Could not check for existing claims:', error);
+                // Continue with the claim attempt
             }
 
-            if (existingClaim) {
-                // Update existing claim with new quantity
-                const newQuantity = (existingClaim.quantity || 0) + quantity;
+            // Create new claim record with quantity
+            try {
+                const { error } = await supabase
+                    .from('exhibitor_meal_claims')
+                    .insert({
+                        company_id: currentCompany.id,
+                        employee_id: employeeId, // Associate with specific employee
+                        meal_slot_id: mealSlotId, // Use snake_case for database consistency
+                        meal_type: mealType,
+                        quantity: quantity,
+                        status: false, // false = claimed
+                        claimed_at: new Date().toISOString(),
+                        expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+                    });
 
-                try {
-                    const { error } = await supabase
-                        .from('exhibitor_meal_claims')
-                        .update({
-                            quantity: newQuantity,
-                            claimed_at: new Date().toISOString(),
-                            expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
-                        })
-                        .eq('id', existingClaim.id);
-
-                    if (error) {
-                        console.error('Failed to update existing claim:', error);
-                        return false;
-                    }
-
-                    console.log(`claimMealBulk: Updated existing claim quantity from ${existingClaim.quantity || 0} to ${newQuantity}`);
-                } catch (error) {
-                    console.error('Database operation failed:', error);
+                if (error) {
+                    console.error('Failed to create new claim:', error);
                     return false;
                 }
-            } else {
-                // Create new claim record with quantity
-                try {
-                    const { error } = await supabase
-                        .from('exhibitor_meal_claims')
-                        .insert({
-                            company_id: currentCompany.id,
-                            employee_id: employeeId, // Associate with specific employee
-                            mealSlotId: mealSlotId,
-                            meal_type: mealType,
-                            quantity: quantity,
-                            status: false, // false = claimed
-                            claimed_at: new Date().toISOString(),
-                            expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
-                        });
 
-                    if (error) {
-                        console.error('Failed to create new claim:', error);
-                        return false;
-                    }
-
-                    console.log(`claimMealBulk: Created new claim with quantity ${quantity} for employee ${employeeId}`);
-                } catch (error) {
-                    console.error('Database operation failed:', error);
-                    return false;
-                }
+                console.log(`claimMealBulk: Created new claim with quantity ${quantity} for employee ${employeeId}`);
+            } catch (error) {
+                console.error('Database operation failed:', error);
+                return false;
             }
 
             console.log('claimMealBulk: Successfully claimed, refreshing data...');
@@ -614,6 +704,8 @@ export const ExhibitorProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         claimMealBulk,
         getMealClaims: getMealClaimsFromSupabase,
         getAvailableAllocations,
+        getSlotAvailability,
+        getClaimedMeal,
         refreshData
     };
 

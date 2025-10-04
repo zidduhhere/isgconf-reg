@@ -14,6 +14,8 @@ interface ExhibitorMealCardProps {
     maxQuantity: number;
     onClaim: (quantity: number) => void;
     isLoading: boolean;
+    isClaimed?: boolean;
+    claimedQuantity?: number;
 }
 
 const ExhibitorMealCard: React.FC<ExhibitorMealCardProps> = ({
@@ -21,7 +23,9 @@ const ExhibitorMealCard: React.FC<ExhibitorMealCardProps> = ({
     isAvailable,
     maxQuantity,
     onClaim,
-    isLoading
+    isLoading,
+    isClaimed = false,
+    claimedQuantity = 0
 }) => {
     const [selectedQuantity, setSelectedQuantity] = useState(1);
 
@@ -37,11 +41,17 @@ const ExhibitorMealCard: React.FC<ExhibitorMealCardProps> = ({
     };
 
     return (
-        <div className="bg-white border border-gray-200 rounded-lg p-6">
+        <div className={`border border-gray-200 rounded-lg p-6 ${isClaimed ? 'bg-green-50 border-green-200' : 'bg-white'}`}>
             <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center space-x-3">
-                    <div className={`p-2 rounded-lg ${mealSlot.type === 'lunch' ? 'bg-green-100' : 'bg-purple-100'}`}>
-                        <UtensilsCrossed className={`h-5 w-5 ${mealSlot.type === 'lunch' ? 'text-green-600' : 'text-purple-600'}`} />
+                    <div className={`p-2 rounded-lg ${isClaimed
+                            ? 'bg-green-100'
+                            : (mealSlot.type === 'lunch' ? 'bg-green-100' : 'bg-purple-100')
+                        }`}>
+                        <UtensilsCrossed className={`h-5 w-5 ${isClaimed
+                                ? 'text-green-600'
+                                : (mealSlot.type === 'lunch' ? 'text-green-600' : 'text-purple-600')
+                            }`} />
                     </div>
                     <div>
                         <h3 className="text-lg font-medium text-gray-900">{mealSlot.name}</h3>
@@ -49,18 +59,35 @@ const ExhibitorMealCard: React.FC<ExhibitorMealCardProps> = ({
                             <Clock className="h-4 w-4 mr-1" />
                             {mealSlot.time}
                         </div>
+                        {isClaimed && (
+                            <div className="flex items-center text-sm text-green-600 mt-1">
+                                <span className="font-medium">✓ Claimed ({claimedQuantity} meal{claimedQuantity !== 1 ? 's' : ''})</span>
+                            </div>
+                        )}
                     </div>
                 </div>
 
                 <div className="text-right">
-                    <p className="text-sm text-gray-600">Available</p>
-                    <p className={`text-lg font-bold ${isAvailable ? 'text-green-600' : 'text-red-600'}`}>
-                        {maxQuantity}
+                    <p className="text-sm text-gray-600">
+                        {isClaimed ? 'Claimed' : 'Available'}
+                    </p>
+                    <p className={`text-lg font-bold ${isClaimed ? 'text-green-600' : (isAvailable ? 'text-green-600' : 'text-red-600')
+                        }`}>
+                        {isClaimed ? claimedQuantity : maxQuantity}
                     </p>
                 </div>
             </div>
 
-            {isAvailable && maxQuantity > 0 ? (
+            {isClaimed ? (
+                <div className="bg-green-100 border border-green-200 rounded-lg p-4 text-center">
+                    <p className="text-green-800 font-medium">
+                        ✓ This meal slot has been claimed
+                    </p>
+                    <p className="text-green-600 text-sm mt-1">
+                        {claimedQuantity} meal{claimedQuantity !== 1 ? 's' : ''} claimed for your company
+                    </p>
+                </div>
+            ) : isAvailable && maxQuantity > 0 ? (
                 <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-3">
                         <span className="text-sm font-medium text-gray-700">Quantity:</span>
