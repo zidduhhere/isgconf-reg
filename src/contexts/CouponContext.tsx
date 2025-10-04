@@ -20,6 +20,13 @@ export const CouponProvider = ({ children, participant }: AuthProviderProps) => 
     const [coupons, setCoupons] = useState<CouponResultType | null>(null);
 
     useEffect(() => {
+        if (!participant?.id) {
+            // Clear coupons if no participant
+            setCoupons(null);
+            setIsLoading(false);
+            return;
+        }
+
         (async () => {
             // First, try to load coupons from localStorage for faster initial load
             const localCoupons = getCouponData();
@@ -67,11 +74,16 @@ export const CouponProvider = ({ children, participant }: AuthProviderProps) => 
                 }
             }
         })()
-    }, [participant.id]);
+    }, [participant?.id]);
 
     const getCoupons = async () => {
         try {
             setIsLoading(true);
+
+            if (!participant?.id) {
+                console.log("No participant ID available for coupon fetch");
+                return [];
+            }
 
             const { data, error } = await supabase.from('coupons').select('*').eq('id', participant.id);
             if (error) {

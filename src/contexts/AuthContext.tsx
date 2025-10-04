@@ -100,12 +100,23 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     };
 
     const logout = async (): Promise<void> => {
-        await supabase.auth.signOut();
-        setCurrentUserState(null);
-        setLoginError(null);
+        try {
+            setIsLoading(true);
+            await supabase.auth.signOut();
+            setCurrentUserState(null);
+            setLoginError(null);
 
-        // Clear all localStorage data on logout
-        localStorage.clear();
+            // Clear all localStorage data on logout
+            localStorage.clear();
+        } catch (error) {
+            console.error('Logout error:', error);
+            // Even if logout fails, clear the user state
+            setCurrentUserState(null);
+            setLoginError(null);
+            localStorage.clear();
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     const clearLoginError = (): void => {
