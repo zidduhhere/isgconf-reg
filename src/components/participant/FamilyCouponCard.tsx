@@ -166,7 +166,7 @@ export const FamilyCouponCard: React.FC<FamilyCouponCardProps> = ({
             >
                 {/* Family Count Badge */}
                 <div className="absolute bottom-4 right-3 bg-white/90 backdrop-blur-sm rounded-full px-3 py-1 z-20">
-                    <span className="text-purple-700 font-bold text-lg">x{participant.familySize}</span>
+                    <span className="text-purple-700 font-bold text-lg">x{participant.familySize - 1}</span>
                 </div>
 
                 {/* Coupon Background Pattern */}
@@ -203,7 +203,7 @@ export const FamilyCouponCard: React.FC<FamilyCouponCardProps> = ({
                                 ISGCON 2025 • Family Coupon
                             </p>
                             <p className="text-xs text-white opacity-80 mt-1 drop-shadow">
-                                For {participant.familySize} people
+                                For {participant.familySize - 1} people
                             </p>
                             <p className="text-xs text-white opacity-80 mt-1 drop-shadow">
                                 {mealSlot.startTime} - {mealSlot.endTime}
@@ -267,7 +267,7 @@ export const FamilyCouponCard: React.FC<FamilyCouponCardProps> = ({
                             <div className="bg-gray-50 rounded-lg p-4 mb-6">
                                 <h4 className="font-semibold text-gray-900 mb-1">{mealSlot.name}</h4>
                                 <p className="text-sm text-gray-600">ISGCON 2025 • Family Coupon</p>
-                                <p className="text-sm text-purple-600 font-medium">Valid for {participant.familySize} people</p>
+                                <p className="text-sm text-purple-600 font-medium">Valid for {participant.familySize - 1} people</p>
                                 <p className="text-sm text-gray-600">Valid for 15 minutes once couponed</p>
                             </div>
 
@@ -275,7 +275,7 @@ export const FamilyCouponCard: React.FC<FamilyCouponCardProps> = ({
                             <div className="bg-purple-50 rounded-lg p-4 mb-6 border border-purple-200">
                                 <h5 className="font-semibold text-purple-900 mb-2">Family Requirements:</h5>
                                 <ul className="text-sm text-purple-700 text-left space-y-1">
-                                    <li>• All {participant.familySize} family members must be present</li>
+                                    <li>• All {participant.familySize - 1} family members must be present</li>
                                     <li>• <strong>Coupon expires automatically after 15 minutes</strong></li>
                                     <li>• Show this coupon to the food counter staff</li>
                                     <li>• Meals will be served for all family members together</li>

@@ -113,7 +113,7 @@ export const Dashboard: React.FC = () => {
 
 
                     {/* Family Coupons Section - Only show if participant has family */}
-                    {currentUser.isFam && (
+                    {currentUser.isFamily && (
                         <div className="mt-8">
                             <div className="text-center mb-6">
                                 <div className="bg-white/80 backdrop-blur-lg w-16 h-16 rounded-full shadow-lg flex items-center justify-center mx-auto mb-3">
@@ -138,124 +138,124 @@ export const Dashboard: React.FC = () => {
                                                 {mealSlots.map((slot) => {
                                                     const familyCoupon = getClaimForSlot(slot.id, familyMemberIndex);
                                                     const familyTimeRemaining = getRemainingTime(`${slot.id}-family-${familyMemberIndex}`, familyMemberIndex);
-                                                    console.log(`Family Member ${familyMemberIndex}, Meal Slot ${slot.id}, Coupon:`, familyCoupon);
-                                                    return (
-                                                        <FamilyCouponCard
-                                                            key={`family-${familyMemberIndex}-${slot.id}`}
-                                                            mealSlot={slot}
-                                                            coupon={familyCoupon || {
-                                                                id: `family-${familyMemberIndex}-${slot.id}`,
-                                                                uniqueId: `family-${familyMemberIndex}-${slot.id}-${currentUser.id}`,
-                                                                mealSlotId: slot.id,
-                                                                familyMemberIndex: familyMemberIndex,
-                                                                status: 'available'
-                                                            }}
-                                                            onClaim={(mealSlotId) => {
-                                                                updateCoupon(mealSlotId, 'active', familyMemberIndex);
-                                                            }}
-                                                            timeRemaining={familyTimeRemaining}
-                                                            participant={currentUser}
-                                                        />
-                                                    );
-                                                })}
-                                            </div>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        </div>
-                    )}
 
-                    {/* Image Placeholders Section */}
-                    <div className="mt-8">
-                        <h3 className="text-lg font-semibold text-gray-900 mb-4 text-center">Event Gallery</h3>
-                        <div className="grid grid-cols-1 gap-4">
-                            {/* Image Placeholder 1 */}
-                            <ImagePlaceholder
-                                gradientFrom="from-blue-100"
-                                gradientTo="to-blue-200"
-                                borderColor="border-blue-300"
+                                                    return (
+                            <FamilyCouponCard
+                              key={`family-${familyMemberIndex}                          -${slot.id}`}
+                                                          mealSlot={slot}
+                                                            coupon={familyCoupon || {
+                                id: `family-${                              familyMemberIndex}-${slot.id}`,
+                                                              uniqueId: `family-${familyMemberIndex}-$                                {slot.id}-${currentUser.id}`,
+                                mealSlotId: slot                                .id,
+                                familyMemberIndex: familyMemberIndex,
+                                                                status: 'available'
+                                                              }}
+                              onClaim={(mealSlotId) => {
+                                                                updateCoupon(mealSlotId, '                              active', familyMemberIndex);
+                                                            }}
+                                                              timeRemaining={familyTimeRemaining}
+                              participant={curren                              tUser}
+                                                          />
+                          );
+                        })}
+                                                    </div>
+                    </div>
+                                              );
+                                          })}
+              </d                        iv>
+            </div>
+                                )}
+
+          {/* Im                    age Placeholders Section                   */}
+          <div                 className="mt-8">
+                          <h3 cla            ssName="text-lg f          ont-semibold t          ext-gray-900 mb-4 text-center">Event Gallery<          /h3>
+            <div className="gr            id grid-cols-1 gap-4">
+              {/* Image Placeholder 1 */}
+              <ImagePlaceholder
+                            gradientFrom="from-blue-100"
+                              gradientTo="to-blue-200"
+                              borderColor="border-blue-300"
                                 iconBgColor="bg-blue-300"
                                 iconColor="text-blue-600"
                                 title="Conference Highlights"
-                                subtitle="Photos coming soon..."
-                                icon={<ImageIcon />}
-                            />
+                                subtitle="Photos coming soon..                ."
+                icon={<ImageIcon />}
+                              />
 
-                            {/* Image Placeholder 2 */}
-                            <ImagePlaceholder
-                                gradientFrom="from-purple-100"
-                                gradientTo="to-purple-200"
-                                borderColor="border-purple-300"
-                                iconBgColor="bg-purple-300"
-                                iconColor="text-purple-600"
-                                title="Speaker Sessions"
+              {/* Image Placeh                older 2 */}
+              <ImagePlaceholder
+                                gradientFrom="from-purpl              e-100"
+                              gradientTo="to-purple-200"
+                              borderColor="border-purple-3                00"
+                iconBgColor="bg-purple-300"                
+                iconColor="text-purple-600                "
+                title="Speaker Sessions"
                                 subtitle="Expert presentations"
                                 titleColor="text-purple-700"
-                                subtitleColor="text-purple-600"
-                                icon={<UserSquare2 />}
-                            />
+                                subtitleColor="text-purpl                e-600"
+                icon={<UserSquare2 />}
+                              />
 
-                            {/* Image Placeholder 3 */}
-                            <ImagePlaceholder
-                                gradientFrom="from-orange-100"
-                                gradientTo="to-orange-200"
-                                borderColor="border-orange-300"
-                                iconBgColor="bg-orange-300"
-                                iconColor="text-orange-600"
-                                title="Venue & Facilities"
-                                subtitle="Hayatt Residency Hotel"
-                                titleColor="text-orange-700"
-                                subtitleColor="text-orange-600"
-                                icon={<Building />}
-                            />
-                        </div>
-                    </div>
+              {/* Image Place                holder 3 */}
+              <ImagePlaceholder
+                                gradientFrom="from-orang              e-100"
+                              gradientTo="to-orange-200"
+                              borderColor="border-orange-3                00"
+                iconBgColor="bg-orange-300"                
+                iconColor="text-orange-600                "
+                title="Venue & Facilities"
+                                subtitle="Hayatt Residency Hote                l"
+                titleColor="text-orange-7                00"
+                subtitleColor="text-ora                nge-600"
+                icon={<Building />}
+                              />
+            </div>
+          </di                v>
 
-                    {/* Instructions */}
-                    <div className="mt-8">
-                        <Instructions
-                            title="How it works:"
-                            items={[
-                                { text: "All meal cards are available anytime" },
-                                { text: "Tap to coupon your meal voucher" },
+          {/* Instructions */}
+          <di                v className="mt-8">
+            <I              nstructions
+                          title=          "How it works:"
+                        items={[
+                          { text: "All meal cards are a            vailable anytime" },
+                              { text: "Tap to coupon your               meal voucher" },
                                 { text: "Show the GREEN card to food servers" },
                                 { text: "Each meal can only be couponed once" },
                                 { text: "Claims expire after 15 minutes" },
-                                ...(currentUser.isFam ? [
-                                    { text: "Family coupons are for all family members together", isHighlighted: true },
-                                    { text: "Ensure all family members are present when couponing", isHighlighted: true }
-                                ] : [])
-                            ]}
-                        />
-                    </div>
+                                ...(currentUser.isFamily ? [
+                  { text: "Fa                mily coupons are for all family members together", isHighlig                hted: true },
+                  { text: "Ens                  ure all family members are present when couponing", isHighlighted: true }
+                ] : [])
+                                ]}
+            />
+          </div>
 
-                    {/* Developer Section */}
-                    {process.env.NODE_ENV !== 'production' && (
-                        <div className="mt-8 pt-6 border-t border-gray-200">
-                            <div className="rounded-md bg-gray-50 p-4">
-                                <div className="flex">
-                                    <div className="flex-shrink-0">
-                                        <Building className="h-5 w-5 text-gray-400" aria-hidden="true" />
-                                    </div>
-                                    <div className="ml-3">
-                                        <h3 className="text-sm font-medium text-gray-800">Developer Resources</h3>
-                                        <div className="mt-2 text-sm text-gray-700">
-                                            <p>Check out the UI component library for this project:</p>
-                                            <a
-                                                href="/ui-components"
-                                                className="mt-2 inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
-                                            >
-                                                View Component Library
-                                            </a>
+          {/* Developer Section */}
+          {process.en                v.NODE_ENV !== 'produc              tion' && (
+                        <div           className="mt-8 pt          -6 border-t border-gray-200">
+                        <div className="rounded-md bg-gray-50 p-4">
+                            <div className="flex">
+                  <div className              ="flex-shrink-0">
+                    <Building className="h                -5 w-5 text-gray-400" aria-hidden="true"                   />
+                  </div>
+                  <div c                    lassName="ml-3">
+                    <h3 className="text-sm font-medium text-gray-80                  0">Developer Resources</h                  3>
+                    <div className="mt-2                     text-sm text-gray-700">
+                      <p>Check out the UI component library for this p                    roject:</p>
+                      <a
+                        href="                      /ui-components"
+                        className="mt-2 inline-flex items-center p                      x-3 py-2 border border-tran                        sparent text-sm leading-4 font-medium rounded-                        md text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+                      >
+                        View Component Library
+                      </a>
+                    </div>
                                         </div>
-                                    </div>
-                                </div>
+                                        </div>
+              </div>
+            </                      div>
+          )}
                             </div>
-                        </div>
-                    )}
-                </div>
-            </div>
-        </div>
-    );
-};
+      </div>
+                      </div>
+  );
+};                                                                        
