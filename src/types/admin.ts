@@ -8,6 +8,10 @@ export interface AdminUser {
 
 export interface AdminStats {
   totalParticipants: number;
+  totalFaculty: number;
+  totalDelegates: number;
+  registeredFaculty: number;
+  registeredDelegates: number;
   totalExhibitors: number;
   totalCoupons: number;
   activeCoupons: number;
@@ -30,6 +34,7 @@ export interface ParticipantAdmin {
   updatedAt: string;
   couponsCount: number;
   activeCouponsCount: number;
+  isRegistered: boolean;
 }
 
 export interface ExhibitorAdmin {
@@ -101,6 +106,8 @@ export interface RegistrationAdmin {
   companyName?: string;
   isFaculty?: boolean;
   registeredAt: string;
+  lastSignInAt?: string;
+  isRecentlySignedIn?: boolean;
 }
 
 export interface AdminContextType {
@@ -148,6 +155,7 @@ export interface AdminContextType {
   // Registrations
   getRegistrations: () => Promise<RegistrationAdmin[]>;
   registerParticipant: (participantId: string) => Promise<boolean>;
+  convertToIST: (utcTimeString: string) => string;
 
   // Legacy interface properties for backward compatibility
   participants?: any[];

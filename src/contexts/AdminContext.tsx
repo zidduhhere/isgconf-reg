@@ -161,21 +161,27 @@ export const AdminProvider: React.FC<AdminProviderProps> = ({ children }) => {
         try {
             console.log('AdminContext: Starting refreshStats...');
             // Get stats from Supabase with fallback for network issues
-            const [participantsResult, exhibitorsResult, couponsResult, mealClaimsResult] = await Promise.allSettled([
-                supabase.from('participants').select('*', { count: 'exact' }),
+            const [participantsResult, exhibitorsResult, couponsResult, mealClaimsResult, registrationsResult] = await Promise.allSettled([
+                supabase.from('participants').select('isFaculty', { count: 'exact' }),
                 supabase.from('exhibitor_companies').select('*', { count: 'exact' }),
                 supabase.from('coupons').select('status', { count: 'exact' }),
-                supabase.from('exhibitor_meal_claims').select('*', { count: 'exact' })
+                supabase.from('exhibitor_meal_claims').select('*', { count: 'exact' }),
+                supabase.from('registrations').select('user_id', { count: 'exact' }).eq('user_type', 'participant')
             ]);
 
             console.log('AdminContext: Query results:', {
                 participants: participantsResult.status,
                 exhibitors: exhibitorsResult.status,
                 coupons: couponsResult.status,
-                mealClaims: mealClaimsResult.status
+                mealClaims: mealClaimsResult.status,
+                registrations: registrationsResult.status
             });
 
             let totalParticipants = 0;
+            let totalFaculty = 0;
+            let totalDelegates = 0;
+            let registeredFaculty = 0;
+            let registeredDelegates = 0;
             let totalExhibitors = 0;
             let totalCoupons = 0;
             let activeCoupons = 0;
@@ -187,8 +193,39 @@ export const AdminProvider: React.FC<AdminProviderProps> = ({ children }) => {
 
             // Handle participants
             if (participantsResult.status === 'fulfilled' && participantsResult.value.data) {
+                const participants = participantsResult.value.data || [];
                 totalParticipants = participantsResult.value.count || 0;
-                console.log('AdminContext: Total participants:', totalParticipants);
+                totalFaculty = participants.filter(p => p.isFaculty === true).length;
+                totalDelegates = participants.filter(p => p.isFaculty === false || p.isFaculty === null).length;
+
+                // Calculate registered faculty and delegates
+                if (registrationsResult.status === 'fulfilled' && registrationsResult.value.data) {
+                    const registrations = registrationsResult.value.data || [];
+                    const registeredUserIds = new Set(registrations.map(r => r.user_id));
+
+                    // Get participants with full data including user IDs to check registration status
+                    const { data: fullParticipants } = await supabase
+                        .from('participants')
+                        .select('id, isFaculty')
+                        .in('id', Array.from(registeredUserIds));
+
+                    if (fullParticipants) {
+                        registeredFaculty = fullParticipants.filter(p => p.isFaculty === true).length;
+                        registeredDelegates = fullParticipants.filter(p => p.isFaculty === false || p.isFaculty === null).length;
+                    }
+                } else {
+                    console.warn('AdminContext: Registrations query failed, setting registered counts to 0');
+                    registeredFaculty = 0;
+                    registeredDelegates = 0;
+                }
+
+                console.log('AdminContext: Participant stats:', {
+                    totalParticipants,
+                    totalFaculty,
+                    totalDelegates,
+                    registeredFaculty,
+                    registeredDelegates
+                });
             } else if (participantsResult.status === 'rejected') {
                 console.error('AdminContext: Participants query failed:', participantsResult.reason);
             }
@@ -242,6 +279,10 @@ export const AdminProvider: React.FC<AdminProviderProps> = ({ children }) => {
 
             const finalStats = {
                 totalParticipants,
+                totalFaculty,
+                totalDelegates,
+                registeredFaculty,
+                registeredDelegates,
                 totalExhibitors,
                 totalCoupons,
                 activeCoupons,
@@ -259,6 +300,10 @@ export const AdminProvider: React.FC<AdminProviderProps> = ({ children }) => {
             // Set fallback stats if Supabase is not available
             setStats({
                 totalParticipants: 0,
+                totalFaculty: 0,
+                totalDelegates: 0,
+                registeredFaculty: 0,
+                registeredDelegates: 0,
                 totalExhibitors: 0,
                 totalCoupons: 0,
                 activeCoupons: 0,
@@ -277,25 +322,66 @@ export const AdminProvider: React.FC<AdminProviderProps> = ({ children }) => {
     const getParticipants = async (): Promise<ParticipantAdmin[]> => {
         setIsLoading(true);
         try {
-            const { data, error } = await supabase
+            // Get participants data
+            const { data: participantsData, error: participantsError } = await supabase
                 .from('participants')
                 .select('*')
-                .order('phoneNumber', { ascending: true }); // Use phoneNumber instead of created_at
+                .order('phoneNumber', { ascending: true });
 
-            if (error) throw error;
+            if (participantsError) throw participantsError;
 
-            return (data || []).map(p => ({
+            if (!participantsData || participantsData.length === 0) {
+                return [];
+            }
+
+            // Get all participant IDs for registration lookup
+            const participantIds = participantsData.map(p => p.id);
+
+            // Check registration status for all participants
+            let registrationStatuses: { [key: string]: boolean } = {};
+
+            try {
+                const { data: registrationsData, error: registrationsError } = await supabase
+                    .from('registrations')
+                    .select('user_id')
+                    .in('user_id', participantIds)
+                    .eq('user_type', 'participant');
+
+                if (registrationsError) {
+                    console.warn('Could not fetch registration data:', registrationsError);
+                    // If registrations table doesn't exist or fails, assume all are not registered
+                    participantIds.forEach(id => {
+                        registrationStatuses[id] = false;
+                    });
+                } else {
+                    // Create a map of registered participant IDs
+                    const registeredIds = new Set((registrationsData || []).map(r => r.user_id));
+
+                    participantIds.forEach(id => {
+                        registrationStatuses[id] = registeredIds.has(id);
+                    });
+                }
+            } catch (registrationCheckError) {
+                console.warn('Registration check failed, assuming all participants are not registered:', registrationCheckError);
+                // If registration check fails entirely, assume all are not registered
+                participantIds.forEach(id => {
+                    registrationStatuses[id] = false;
+                });
+            }
+
+            return participantsData.map(p => ({
                 id: p.id,
-                phoneNumber: p.phoneNumber, // Use correct column name
+                phoneNumber: p.phoneNumber,
                 name: p.name,
-                familySize: p.familySize || 1, // Use correct column name from database
-                isFam: p.isFam || false, // Use correct column name
-                hospitalName: p.hospitalName || '', // Add missing field
-                isFaculty: p.isFaculty || false, // Add missing field
+                familySize: p.familySize || 1,
+                isFam: p.isFam || false,
+                hospitalName: p.hospitalName || '',
+                isFaculty: p.isFaculty || false,
                 couponsCount: 0, // Will be calculated separately
                 activeCouponsCount: 0, // Will be calculated separately
-                createdAt: new Date().toISOString(), // Add default since no created_at in DB
-                updatedAt: new Date().toISOString() // Add default since no updated_at in DB
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+                isRegistered: registrationStatuses[p.id] || false
             }));
         } catch (error) {
             console.error('Error getting participants:', error);
@@ -945,17 +1031,66 @@ export const AdminProvider: React.FC<AdminProviderProps> = ({ children }) => {
     };
 
     // Registration management functions
+    // Helper function to convert UTC time to Indian Standard Time
+    const convertToIST = (utcTimeString: string): string => {
+        const utcDate = new Date(utcTimeString);
+        // IST is UTC+5:30
+        const istDate = new Date(utcDate.getTime() + (5.5 * 60 * 60 * 1000));
+        return istDate.toLocaleString('en-IN', {
+            timeZone: 'Asia/Kolkata',
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+            hour12: true
+        });
+    };
+
     const getRegistrations = async (): Promise<RegistrationAdmin[]> => {
         setIsLoading(true);
         try {
-            const { data, error } = await supabase
-                .from('registrations')
-                .select('*')
-                .order('registered_at', { ascending: false });
+            // Check if registrations table exists, fallback to participants table
+            let registrationsData;
+            let registrationsError;
 
-            if (error) throw error;
+            try {
+                const { data, error } = await supabase
+                    .from('registrations')
+                    .select('*')
+                    .order('registered_at', { ascending: false });
+                registrationsData = data;
+                registrationsError = error;
+            } catch (regTableError) {
+                console.log('Registrations table not found, using participants table');
+                // Fallback to participants table if registrations doesn't exist
+                const { data, error } = await supabase
+                    .from('participants')
+                    .select('*')
+                    .order('phoneNumber', { ascending: true });
 
-            return (data || []).map(r => ({
+                if (error) throw error;
+
+                // Map participants to registration format
+                return (data || []).map(p => ({
+                    id: p.id,
+                    userId: p.id,
+                    userType: 'participant' as const,
+                    name: p.name,
+                    phoneNumber: p.phoneNumber || '',
+                    companyName: p.hospitalName || '',
+                    isFaculty: p.isFaculty || false,
+                    registeredAt: convertToIST(new Date().toISOString()), // Use current time as default
+                    lastSignInAt: undefined, // Cannot access auth data without service role
+                    isRecentlySignedIn: false // Cannot determine without auth access
+                }));
+            }
+
+            if (registrationsError) throw registrationsError;
+
+            // Process registrations data without auth.users access
+            return (registrationsData || []).map(r => ({
                 id: r.id,
                 userId: r.user_id,
                 userType: r.user_type,
@@ -963,7 +1098,9 @@ export const AdminProvider: React.FC<AdminProviderProps> = ({ children }) => {
                 phoneNumber: r.phone_number || '',
                 companyName: r.company_name || '',
                 isFaculty: r.is_faculty || false,
-                registeredAt: r.registered_at
+                registeredAt: convertToIST(r.registered_at),
+                lastSignInAt: undefined, // Cannot access auth.users without service role
+                isRecentlySignedIn: false // Cannot determine without auth access
             }));
         } catch (error) {
             console.error('Error getting registrations:', error);
@@ -1132,15 +1269,6 @@ export const AdminProvider: React.FC<AdminProviderProps> = ({ children }) => {
         }
     };
 
-    // Legacy statistics function
-    const getCouponStatusCounts = () => {
-        if (!allClaims) return { available: 0, active: 0, used: 0, total: 0 };
-        const available = allClaims.filter(c => c.status === 'available').length;
-        const active = allClaims.filter(c => c.status === 'active').length;
-        const used = allClaims.filter(c => c.status === 'used').length;
-        return { available, active, used, total: allClaims.length };
-    };
-
     const getParticipantStats = () => {
         if (!participants || !allClaims) {
             return {
@@ -1193,6 +1321,7 @@ export const AdminProvider: React.FC<AdminProviderProps> = ({ children }) => {
         claimExhibitorMeal,
         getRegistrations,
         registerParticipant,
+        convertToIST,
 
         // Legacy interface properties for backward compatibility
         participants,

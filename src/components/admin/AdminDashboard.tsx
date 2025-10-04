@@ -18,9 +18,12 @@ import {
     Award,
     Star,
     Circle,
+    GraduationCap,
+    Briefcase,
     AlertCircle,
     Shield,
-    Edit
+    Edit,
+    UserCheck
 } from 'lucide-react';
 import { ParticipantAdmin, ExhibitorAdmin, ExhibitorEmployeeAdmin, CouponAdmin, MealClaimAdmin, RegistrationAdmin } from '../../types/admin';
 
@@ -50,7 +53,8 @@ export const AdminDashboardNew: React.FC = () => {
         resetMealClaim,
         claimExhibitorMeal,
         getRegistrations,
-        registerParticipant
+        registerParticipant,
+        convertToIST
     } = useAdmin();
 
     const navigate = useNavigate();
@@ -108,6 +112,26 @@ export const AdminDashboardNew: React.FC = () => {
             loadData();
         }
     }, [currentAdmin, navigate]);
+
+    // Auto-refresh registration data every 5 minutes to keep last sign-in status current
+    useEffect(() => {
+        if (!currentAdmin) return;
+
+        const refreshRegistrations = async () => {
+            try {
+                const registrationsData = await getRegistrations();
+                setRegistrations(registrationsData);
+            } catch (error) {
+                console.error('Error refreshing registrations:', error);
+            }
+        };
+
+        // Set up interval for auto-refresh every 5 minutes (300,000 ms)
+        const intervalId = setInterval(refreshRegistrations, 5 * 60 * 1000);
+
+        // Clean up interval on component unmount
+        return () => clearInterval(intervalId);
+    }, [currentAdmin, getRegistrations]);
 
     const loadData = async () => {
         setIsRefreshing(true);
@@ -357,8 +381,9 @@ export const AdminDashboardNew: React.FC = () => {
 
     const renderOverview = () => (
         <div className="space-y-6">
-            {/* Stats Cards */}
+            {/* Stats Cards - 2x4 Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                {/* First Row */}
                 <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
                     <div className="flex items-center">
                         <div className="flex-shrink-0">
@@ -380,6 +405,42 @@ export const AdminDashboardNew: React.FC = () => {
                 <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
                     <div className="flex items-center">
                         <div className="flex-shrink-0">
+                            <GraduationCap className="h-8 w-8 text-indigo-600" />
+                        </div>
+                        <div className="ml-5 w-0 flex-1">
+                            <dl>
+                                <dt className="text-sm font-medium text-gray-500 truncate">
+                                    Faculty
+                                </dt>
+                                <dd className="text-2xl font-semibold text-gray-900">
+                                    {stats?.totalFaculty || 0}
+                                </dd>
+                            </dl>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                    <div className="flex items-center">
+                        <div className="flex-shrink-0">
+                            <Briefcase className="h-8 w-8 text-slate-600" />
+                        </div>
+                        <div className="ml-5 w-0 flex-1">
+                            <dl>
+                                <dt className="text-sm font-medium text-gray-500 truncate">
+                                    Delegates
+                                </dt>
+                                <dd className="text-2xl font-semibold text-gray-900">
+                                    {stats?.totalDelegates || 0}
+                                </dd>
+                            </dl>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                    <div className="flex items-center">
+                        <div className="flex-shrink-0">
                             <Building2 className="h-8 w-8 text-purple-600" />
                         </div>
                         <div className="ml-5 w-0 flex-1">
@@ -389,6 +450,43 @@ export const AdminDashboardNew: React.FC = () => {
                                 </dt>
                                 <dd className="text-2xl font-semibold text-gray-900">
                                     {stats?.totalExhibitors || 0}
+                                </dd>
+                            </dl>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Second Row */}
+                <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                    <div className="flex items-center">
+                        <div className="flex-shrink-0">
+                            <UserCheck className="h-8 w-8 text-emerald-600" />
+                        </div>
+                        <div className="ml-5 w-0 flex-1">
+                            <dl>
+                                <dt className="text-sm font-medium text-gray-500 truncate">
+                                    Registered Faculty
+                                </dt>
+                                <dd className="text-2xl font-semibold text-gray-900">
+                                    {stats?.registeredFaculty || 0}
+                                </dd>
+                            </dl>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                    <div className="flex items-center">
+                        <div className="flex-shrink-0">
+                            <UserCheck className="h-8 w-8 text-teal-600" />
+                        </div>
+                        <div className="ml-5 w-0 flex-1">
+                            <dl>
+                                <dt className="text-sm font-medium text-gray-500 truncate">
+                                    Registered Delegates
+                                </dt>
+                                <dd className="text-2xl font-semibold text-gray-900">
+                                    {stats?.registeredDelegates || 0}
                                 </dd>
                             </dl>
                         </div>
@@ -431,6 +529,43 @@ export const AdminDashboardNew: React.FC = () => {
                     </div>
                 </div>
             </div>
+
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                <div className="flex items-center">
+                    <div className="flex-shrink-0">
+                        <Ticket className="h-8 w-8 text-green-600" />
+                    </div>
+                    <div className="ml-5 w-0 flex-1">
+                        <dl>
+                            <dt className="text-sm font-medium text-gray-500 truncate">
+                                Active Coupons
+                            </dt>
+                            <dd className="text-2xl font-semibold text-gray-900">
+                                {stats?.activeCoupons || 0}
+                            </dd>
+                        </dl>
+                    </div>
+                </div>
+            </div>
+
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                <div className="flex items-center">
+                    <div className="flex-shrink-0">
+                        <UtensilsCrossed className="h-8 w-8 text-orange-600" />
+                    </div>
+                    <div className="ml-5 w-0 flex-1">
+                        <dl>
+                            <dt className="text-sm font-medium text-gray-500 truncate">
+                                Meal Claims
+                            </dt>
+                            <dd className="text-2xl font-semibold text-gray-900">
+                                {stats?.totalMealClaims || 0}
+                            </dd>
+                        </dl>
+                    </div>
+                </div>
+            </div>
+
 
             {/* Quick Actions */}
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
@@ -551,6 +686,9 @@ export const AdminDashboardNew: React.FC = () => {
                                     Faculty
                                 </th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Registration Status
+                                </th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                     Coupons
                                 </th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -588,7 +726,13 @@ export const AdminDashboardNew: React.FC = () => {
                                         <td className="px-6 py-4 whitespace-nowrap">
                                             <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${participant.isFaculty ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800'
                                                 }`}>
-                                                {participant.isFaculty ? 'Faculty' : 'Student'}
+                                                {participant.isFaculty ? 'Faculty' : 'Delegate'}
+                                            </span>
+                                        </td>
+                                        <td className="px-6 py-4 whitespace-nowrap">
+                                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${participant.isRegistered ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                                                }`}>
+                                                {participant.isRegistered ? 'Registered' : 'Not Registered'}
                                             </span>
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
@@ -639,99 +783,133 @@ export const AdminDashboardNew: React.FC = () => {
         </div>
     );
 
-    const renderExhibitors = () => (
-        <div className="space-y-6">
-            {/* Exhibitors Header */}
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                    <h2 className="text-xl font-semibold text-gray-900">Exhibitors Management</h2>
-                    <p className="text-sm text-gray-600">Manage exhibitor companies and their meal allocations</p>
-                </div>
-                <div className="mt-4 sm:mt-0 flex space-x-3">
-                    <button
-                        onClick={() => setShowAddExhibitor(true)}
-                        className="inline-flex items-center px-4 py-2 bg-purple-600 text-white text-sm font-medium rounded-lg hover:bg-purple-700 transition-colors"
-                    >
-                        <Building2 className="h-4 w-4 mr-2" />
-                        Add Exhibitor
-                    </button>
-                </div>
-            </div>
+    const renderExhibitors = () => {
+        // Filter exhibitors based on search term
+        const filteredExhibitors = exhibitors.filter(exhibitor =>
+            exhibitor.companyName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            exhibitor.companyId.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            exhibitor.phoneNumber.includes(searchTerm) ||
+            exhibitor.plan.toLowerCase().includes(searchTerm.toLowerCase())
+        );
 
-            {/* Exhibitors Table */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-                <div className="overflow-x-auto">
-                    <table className="min-w-full divide-y divide-gray-200">
-                        <thead className="bg-gray-50">
-                            <tr>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    Company
-                                </th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    Plan
-                                </th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    Lunch Allocation
-                                </th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    Dinner Allocation
-                                </th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    Actions
-                                </th>
-                            </tr>
-                        </thead>
-                        <tbody className="bg-white divide-y divide-gray-200">
-                            {exhibitors.map((exhibitor) => (
-                                <tr key={exhibitor.id} className="hover:bg-gray-50">
-                                    <td className="px-6 py-4 whitespace-nowrap">
-                                        <div>
-                                            <div className="text-sm font-medium text-gray-900">
-                                                {exhibitor.companyName}
-                                            </div>
-                                            <div className="text-sm text-gray-500">
-                                                {exhibitor.companyId} • {exhibitor.phoneNumber}
-                                            </div>
-                                        </div>
-                                    </td>
-                                    <td className="px-6 py-4 whitespace-nowrap">
-                                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getPlanColor(exhibitor.plan)}`}>
-                                            {getPlanIcon(exhibitor.plan)}
-                                            <span className="ml-1">{exhibitor.plan}</span>
-                                        </span>
-                                    </td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                        <div className="flex items-center space-x-2">
-                                            <span className="text-green-600">{exhibitor.lunchUsed}</span>
-                                            <span className="text-gray-400">/</span>
-                                            <span className="text-gray-900">{exhibitor.lunchAllocation}</span>
-                                        </div>
-                                    </td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                        <div className="flex items-center space-x-2">
-                                            <span className="text-purple-600">{exhibitor.dinnerUsed}</span>
-                                            <span className="text-gray-400">/</span>
-                                            <span className="text-gray-900">{exhibitor.dinnerAllocation}</span>
-                                        </div>
-                                    </td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                        <div className="flex items-center space-x-2">
-                                            <button
-                                                onClick={() => handleDeleteExhibitor(exhibitor.id)}
-                                                className="text-red-600 hover:text-red-900"
-                                            >
-                                                <Trash2 className="h-4 w-4" />
-                                            </button>
-                                        </div>
-                                    </td>
+        return (
+            <div className="space-y-6">
+                {/* Exhibitors Header */}
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                        <h2 className="text-xl font-semibold text-gray-900">Exhibitors Management</h2>
+                        <p className="text-sm text-gray-600">Manage exhibitor companies and their meal allocations ({filteredExhibitors.length} of {exhibitors.length} exhibitors)</p>
+                    </div>
+                    <div className="mt-4 sm:mt-0 flex space-x-3">
+                        <button
+                            onClick={() => setShowAddExhibitor(true)}
+                            className="inline-flex items-center px-4 py-2 bg-purple-600 text-white text-sm font-medium rounded-lg hover:bg-purple-700 transition-colors"
+                        >
+                            <Building2 className="h-4 w-4 mr-2" />
+                            Add Exhibitor
+                        </button>
+                    </div>
+                </div>
+
+                {/* Search */}
+                <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <Search className="h-5 w-5 text-gray-400" />
+                    </div>
+                    <input
+                        type="text"
+                        placeholder="Search exhibitors by company name, ID, phone, or plan..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    />
+                </div>
+
+                {/* Exhibitors Table */}
+                <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                    <div className="overflow-x-auto">
+                        <table className="min-w-full divide-y divide-gray-200">
+                            <thead className="bg-gray-50">
+                                <tr>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        Company
+                                    </th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        Plan
+                                    </th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        Lunch Allocation
+                                    </th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        Dinner Allocation
+                                    </th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        Actions
+                                    </th>
                                 </tr>
-                            ))}
-                        </tbody>
-                    </table>
+                            </thead>
+                            <tbody className="bg-white divide-y divide-gray-200">
+                                {filteredExhibitors.length === 0 ? (
+                                    <tr>
+                                        <td colSpan={5} className="px-6 py-4 text-center">
+                                            <p className="text-gray-500">
+                                                {searchTerm ? 'No exhibitors found matching your search.' : 'No exhibitors available.'}
+                                            </p>
+                                        </td>
+                                    </tr>
+                                ) : (
+                                    filteredExhibitors.map((exhibitor) => (
+                                        <tr key={exhibitor.id} className="hover:bg-gray-50">
+                                            <td className="px-6 py-4 whitespace-nowrap">
+                                                <div>
+                                                    <div className="text-sm font-medium text-gray-900">
+                                                        {exhibitor.companyName}
+                                                    </div>
+                                                    <div className="text-sm text-gray-500">
+                                                        {exhibitor.companyId} • {exhibitor.phoneNumber}
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap">
+                                                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getPlanColor(exhibitor.plan)}`}>
+                                                    {getPlanIcon(exhibitor.plan)}
+                                                    <span className="ml-1">{exhibitor.plan}</span>
+                                                </span>
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                                <div className="flex items-center space-x-2">
+                                                    <span className="text-green-600">{exhibitor.lunchUsed}</span>
+                                                    <span className="text-gray-400">/</span>
+                                                    <span className="text-gray-900">{exhibitor.lunchAllocation}</span>
+                                                </div>
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                                <div className="flex items-center space-x-2">
+                                                    <span className="text-purple-600">{exhibitor.dinnerUsed}</span>
+                                                    <span className="text-gray-400">/</span>
+                                                    <span className="text-gray-900">{exhibitor.dinnerAllocation}</span>
+                                                </div>
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                                <div className="flex items-center space-x-2">
+                                                    <button
+                                                        onClick={() => handleDeleteExhibitor(exhibitor.id)}
+                                                        className="text-red-600 hover:text-red-900"
+                                                    >
+                                                        <Trash2 className="h-4 w-4" />
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
-        </div>
-    );
+        );
+    };
 
     const renderEmployees = () => (
         <div className="space-y-6">
@@ -1151,7 +1329,10 @@ export const AdminDashboardNew: React.FC = () => {
                                     Contact
                                 </th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    Registered At
+                                    Registered At (IST)
+                                </th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Last Sign In
                                 </th>
                             </tr>
                         </thead>
@@ -1186,7 +1367,7 @@ export const AdminDashboardNew: React.FC = () => {
                                             {registration.userType === 'participant' ? (
                                                 <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${registration.isFaculty ? 'bg-purple-100 text-purple-800' : 'bg-gray-100 text-gray-800'
                                                     }`}>
-                                                    {registration.isFaculty ? 'Faculty' : 'Student'}
+                                                    {registration.isFaculty ? 'Faculty' : 'Delegate'}
                                                 </span>
                                             ) : registration.userType === 'exhibitor' ? (
                                                 <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800">
@@ -1202,7 +1383,23 @@ export const AdminDashboardNew: React.FC = () => {
                                             {registration.phoneNumber || 'N/A'}
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                            {new Date(registration.registeredAt).toLocaleString()}
+                                            {convertToIST(registration.registeredAt)}
+                                        </td>
+                                        <td className="px-6 py-4 whitespace-nowrap">
+                                            {registration.lastSignInAt ? (
+                                                <div className="space-y-1">
+                                                    <div className="text-sm text-gray-900">
+                                                        {convertToIST(registration.lastSignInAt)}
+                                                    </div>
+                                                    {registration.isRecentlySignedIn && (
+                                                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                                            Recently signed in
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            ) : (
+                                                <span className="text-sm text-gray-500">Never signed in</span>
+                                            )}
                                         </td>
                                     </tr>
                                 ))}
