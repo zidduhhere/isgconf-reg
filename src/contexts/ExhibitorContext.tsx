@@ -439,14 +439,7 @@ export const ExhibitorProvider: React.FC<{ children: React.ReactNode }> = ({ chi
             lunchClaimed,
             dinnerClaimed,
             availableLunch: Math.max(0, planAllocation.lunch - lunchClaimed),
-            availableDinner: Math.max(0, planAllocation.dinner - dinnerClaimed),
-            totalMealClaims: mealClaims.length,
-            mealClaimsForDebug: mealClaims.map(c => ({
-                mealType: c.mealType,
-                quantity: c.quantity,
-                status: c.status,
-                employeeId: c.employeeId
-            }))
+            availableDinner: Math.max(0, planAllocation.dinner - dinnerClaimed)
         });
 
         return {
@@ -473,9 +466,7 @@ export const ExhibitorProvider: React.FC<{ children: React.ReactNode }> = ({ chi
                 quantity,
                 employeeId,
                 available,
-                allocations,
-                currentMealClaims: mealClaims.length,
-                claimsForThisType: mealClaims.filter(claim => claim.mealType === mealType && claim.status === false)
+                allocations
             });
 
             if (quantity > available) {
@@ -599,7 +590,6 @@ export const ExhibitorProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
             // Refresh meal claims
             const claimsData = await getMealClaimsFromSupabase();
-            console.log('refreshData: Setting meal claims:', claimsData);
             setMealClaims(claimsData);
 
             // Clean up expired claims
@@ -607,7 +597,7 @@ export const ExhibitorProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         } catch (error) {
             console.error('Error refreshing data:', error);
         }
-    }, [currentCompany, getEmployeesFromSupabase, getMealClaimsFromSupabase]);
+    }, [currentCompany, getEmployeesFromSupabase, getMealClaimsFromSupabase, transformCompanyData]);
 
     const value: ExhibitorContextType = {
         currentCompany,

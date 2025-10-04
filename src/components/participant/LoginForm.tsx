@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { Smartphone, ArrowRight, Stethoscope, Shield, Users, Award } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { EventDetails, FeatureGrid } from '../ui';
@@ -180,14 +180,6 @@ export const LoginForm: React.FC = () => {
                   <span className="px-2 sm:px-3 bg-white text-neutral-500">or</span>
                 </div>
               </div>
-
-              {/* Navigation Button */}
-              <Link
-                to="/"
-                className="w-full bg-neutral-100 hover:bg-neutral-200 text-neutral-700 font-medium py-2.5 px-3 sm:px-4 rounded-lg transition-all duration-300 transform hover:scale-[1.02] flex items-center justify-center gap-2 text-xs sm:text-sm"
-              >
-                <span>← Back to Event Information</span>
-              </Link>
 
               {/* Security Badge */}
               <div className="mt-3 sm:mt-4 text-center">

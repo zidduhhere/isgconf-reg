@@ -92,6 +92,17 @@ export interface MealClaimAdmin {
   createdAt: string;
 }
 
+export interface RegistrationAdmin {
+  id: string;
+  userId: string;
+  userType: 'participant' | 'exhibitor' | 'admin';
+  name: string;
+  phoneNumber?: string;
+  companyName?: string;
+  isFaculty?: boolean;
+  registeredAt: string;
+}
+
 export interface AdminContextType {
   // New interface properties
   currentAdmin: AdminUser | null;
@@ -130,6 +141,10 @@ export interface AdminContextType {
   getMealClaims: () => Promise<MealClaimAdmin[]>;
   resetMealClaim: (claimId: string) => Promise<boolean>;
   claimExhibitorMeal: (companyId: string, mealSlotId: string, mealType: 'lunch' | 'dinner', employeeId: string, quantity?: number) => Promise<boolean>;
+
+  // Registrations
+  getRegistrations: () => Promise<RegistrationAdmin[]>;
+  registerParticipant: (participantId: string) => Promise<boolean>;
 
   // Legacy interface properties for backward compatibility
   participants?: any[];

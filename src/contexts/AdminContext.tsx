@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { Participant, MealSlot, Coupon, firstLunch, secondLunch, dinner } from '../types';
-import { AdminContextType, AdminUser, AdminStats, ParticipantAdmin, ExhibitorAdmin, ExhibitorEmployeeAdmin, CouponAdmin, MealClaimAdmin, CouponFilters } from '../types/admin';
+import { AdminContextType, AdminUser, AdminStats, ParticipantAdmin, ExhibitorAdmin, ExhibitorEmployeeAdmin, CouponAdmin, MealClaimAdmin, CouponFilters, RegistrationAdmin } from '../types/admin';
 import { supabase } from '../services/supabase';
 import { MEAL_SLOTS } from '../data/mockData';
 import {
@@ -828,6 +828,89 @@ export const AdminProvider: React.FC<AdminProviderProps> = ({ children }) => {
         }
     };
 
+    // Registration management functions
+    const getRegistrations = async (): Promise<RegistrationAdmin[]> => {
+        setIsLoading(true);
+        try {
+            const { data, error } = await supabase
+                .from('registrations')
+                .select('*')
+                .order('registered_at', { ascending: false });
+
+            if (error) throw error;
+
+            return (data || []).map(r => ({
+                id: r.id,
+                userId: r.user_id,
+                userType: r.user_type,
+                name: r.name,
+                phoneNumber: r.phone_number || '',
+                companyName: r.company_name || '',
+                isFaculty: r.is_faculty || false,
+                registeredAt: r.registered_at
+            }));
+        } catch (error) {
+            console.error('Error getting registrations:', error);
+            return [];
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const registerParticipant = async (participantId: string): Promise<boolean> => {
+        setIsLoading(true);
+        try {
+            // First get the participant data
+            const { data: participant, error: participantError } = await supabase
+                .from('participants')
+                .select('*')
+                .eq('id', participantId)
+                .single();
+
+            if (participantError || !participant) {
+                console.error('Error fetching participant:', participantError);
+                return false;
+            }
+
+            // Check if registration already exists
+            const { data: existingRegistration } = await supabase
+                .from('registrations')
+                .select('id')
+                .eq('user_id', participantId)
+                .eq('user_type', 'participant')
+                .maybeSingle();
+
+            if (existingRegistration) {
+                console.log('Participant already registered');
+                return true; // Already registered, consider it success
+            }
+
+            // Insert new registration
+            const { error: insertError } = await supabase
+                .from('registrations')
+                .insert({
+                    user_id: participantId,
+                    user_type: 'participant',
+                    name: participant.name,
+                    phone_number: participant.phoneNumber,
+                    is_faculty: participant.isFaculty || false,
+                    registered_at: new Date().toISOString()
+                });
+
+            if (insertError) {
+                console.error('Error inserting registration:', insertError);
+                return false;
+            }
+
+            return true;
+        } catch (error) {
+            console.error('Error registering participant:', error);
+            return false;
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
     const claimExhibitorMeal = async (
         companyId: string,
         mealSlotId: string,
@@ -989,6 +1072,8 @@ export const AdminProvider: React.FC<AdminProviderProps> = ({ children }) => {
         getMealClaims,
         resetMealClaim,
         claimExhibitorMeal,
+        getRegistrations,
+        registerParticipant,
 
         // Legacy interface properties for backward compatibility
         participants,

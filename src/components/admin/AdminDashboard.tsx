@@ -21,9 +21,9 @@ import {
     AlertCircle,
     Shield
 } from 'lucide-react';
-import { ParticipantAdmin, ExhibitorAdmin, ExhibitorEmployeeAdmin, CouponAdmin, MealClaimAdmin } from '../../types/admin';
+import { ParticipantAdmin, ExhibitorAdmin, ExhibitorEmployeeAdmin, CouponAdmin, MealClaimAdmin, RegistrationAdmin } from '../../types/admin';
 
-type TabType = 'overview' | 'participants' | 'exhibitors' | 'employees' | 'coupons' | 'claims' | 'analytics';
+type TabType = 'overview' | 'participants' | 'exhibitors' | 'employees' | 'coupons' | 'claims' | 'registrations' | 'analytics';
 
 export const AdminDashboardNew: React.FC = () => {
     const {
@@ -44,7 +44,9 @@ export const AdminDashboardNew: React.FC = () => {
         resetParticipantCoupons,
         getMealClaims,
         resetMealClaim,
-        claimExhibitorMeal
+        claimExhibitorMeal,
+        getRegistrations,
+        registerParticipant
     } = useAdmin();
 
     const navigate = useNavigate();
@@ -54,6 +56,7 @@ export const AdminDashboardNew: React.FC = () => {
     const [employees, setEmployees] = useState<ExhibitorEmployeeAdmin[]>([]);
     const [coupons, setCoupons] = useState<CouponAdmin[]>([]);
     const [mealClaims, setMealClaims] = useState<MealClaimAdmin[]>([]);
+    const [registrations, setRegistrations] = useState<RegistrationAdmin[]>([]);
     const [searchTerm, setSearchTerm] = useState('');
     const [isRefreshing, setIsRefreshing] = useState(false);
 
@@ -99,12 +102,13 @@ export const AdminDashboardNew: React.FC = () => {
     const loadData = async () => {
         setIsRefreshing(true);
         try {
-            const [participantsData, exhibitorsData, employeesData, couponsData, claimsData] = await Promise.all([
+            const [participantsData, exhibitorsData, employeesData, couponsData, claimsData, registrationsData] = await Promise.all([
                 getParticipants(),
                 getExhibitors(),
                 getExhibitorEmployees(),
                 getCoupons(),
-                getMealClaims()
+                getMealClaims(),
+                getRegistrations()
             ]);
 
             setParticipants(participantsData);
@@ -112,6 +116,7 @@ export const AdminDashboardNew: React.FC = () => {
             setEmployees(employeesData);
             setCoupons(couponsData);
             setMealClaims(claimsData);
+            setRegistrations(registrationsData);
 
             // Load data for manual claim form
             const companiesData = exhibitorsData.map(e => ({
@@ -148,6 +153,7 @@ export const AdminDashboardNew: React.FC = () => {
         { id: 'employees' as TabType, name: 'Employees', icon: UserPlus, count: employees.length },
         { id: 'coupons' as TabType, name: 'Coupons', icon: Ticket, count: stats?.totalCoupons },
         { id: 'claims' as TabType, name: 'Meal Claims', icon: UtensilsCrossed, count: stats?.totalMealClaims },
+        { id: 'registrations' as TabType, name: 'Registrations', icon: Shield, count: registrations.length },
         { id: 'analytics' as TabType, name: 'Analytics', icon: BarChart3, count: null },
     ];
 
@@ -196,6 +202,18 @@ export const AdminDashboardNew: React.FC = () => {
             const success = await deleteParticipant(id);
             if (success) {
                 loadData();
+            }
+        }
+    };
+
+    const handleRegisterParticipant = async (participantId: string, participantName: string) => {
+        if (window.confirm(`Register ${participantName} for the event?\n\nThis will:\n• Add them to the event registration list\n• Track their registration status\n• Allow participation in event activities`)) {
+            const success = await registerParticipant(participantId);
+            if (success) {
+                alert(`${participantName} has been successfully registered for the event!`);
+                loadData(); // Refresh data to update registration counts
+            } else {
+                alert('Failed to register participant. Please try again.');
             }
         }
     };
@@ -530,14 +548,23 @@ export const AdminDashboardNew: React.FC = () => {
                                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                                             <div className="flex items-center space-x-2">
                                                 <button
+                                                    onClick={() => handleRegisterParticipant(participant.id, participant.name)}
+                                                    className="text-blue-600 hover:text-blue-900"
+                                                    title="Register for Event"
+                                                >
+                                                    <UserPlus className="h-4 w-4" />
+                                                </button>
+                                                <button
                                                     onClick={() => resetParticipantCoupons(participant.id)}
                                                     className="text-orange-600 hover:text-orange-900"
+                                                    title="Reset Coupons"
                                                 >
                                                     <RotateCcw className="h-4 w-4" />
                                                 </button>
                                                 <button
                                                     onClick={() => handleDeleteParticipant(participant.id)}
                                                     className="text-red-600 hover:text-red-900"
+                                                    title="Delete Participant"
                                                 >
                                                     <Trash2 className="h-4 w-4" />
                                                 </button>
@@ -1026,6 +1053,106 @@ export const AdminDashboardNew: React.FC = () => {
         </div>
     );
 
+    const renderRegistrations = () => (
+        <div className="space-y-6">
+            <div>
+                <h2 className="text-xl font-semibold text-gray-900">Event Registrations</h2>
+                <p className="text-sm text-gray-600">Track all event registrations and user roles</p>
+            </div>
+
+            {/* Search */}
+            <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                <input
+                    type="text"
+                    placeholder="Search registrations..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+            </div>
+
+            {/* Registrations Table */}
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-gray-200">
+                        <thead className="bg-gray-50">
+                            <tr>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    User
+                                </th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Type
+                                </th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Role
+                                </th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Contact
+                                </th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Registered At
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-gray-200">
+                            {registrations
+                                .filter(r =>
+                                    r.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                                    (r.phoneNumber && r.phoneNumber.includes(searchTerm)) ||
+                                    (r.companyName && r.companyName.toLowerCase().includes(searchTerm.toLowerCase()))
+                                )
+                                .map((registration) => (
+                                    <tr key={registration.id} className="hover:bg-gray-50">
+                                        <td className="px-6 py-4 whitespace-nowrap">
+                                            <div>
+                                                <div className="text-sm font-medium text-gray-900">
+                                                    {registration.name}
+                                                </div>
+                                                <div className="text-sm text-gray-500">
+                                                    ID: {registration.userId.slice(0, 8)}...
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td className="px-6 py-4 whitespace-nowrap">
+                                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${registration.userType === 'participant' ? 'bg-blue-100 text-blue-800' :
+                                                registration.userType === 'exhibitor' ? 'bg-green-100 text-green-800' :
+                                                    'bg-red-100 text-red-800'
+                                                }`}>
+                                                {registration.userType.charAt(0).toUpperCase() + registration.userType.slice(1)}
+                                            </span>
+                                        </td>
+                                        <td className="px-6 py-4 whitespace-nowrap">
+                                            {registration.userType === 'participant' ? (
+                                                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${registration.isFaculty ? 'bg-purple-100 text-purple-800' : 'bg-gray-100 text-gray-800'
+                                                    }`}>
+                                                    {registration.isFaculty ? 'Faculty' : 'Student'}
+                                                </span>
+                                            ) : registration.userType === 'exhibitor' ? (
+                                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800">
+                                                    {registration.companyName || 'Company'}
+                                                </span>
+                                            ) : (
+                                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                                                    Admin
+                                                </span>
+                                            )}
+                                        </td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                            {registration.phoneNumber || 'N/A'}
+                                        </td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                            {new Date(registration.registeredAt).toLocaleString()}
+                                        </td>
+                                    </tr>
+                                ))}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    );
+
     const renderAnalytics = () => (
         <div className="space-y-6">
             <div>
@@ -1142,6 +1269,7 @@ export const AdminDashboardNew: React.FC = () => {
                 {activeTab === 'employees' && renderEmployees()}
                 {activeTab === 'coupons' && renderCoupons()}
                 {activeTab === 'claims' && renderMealClaims()}
+                {activeTab === 'registrations' && renderRegistrations()}
                 {activeTab === 'analytics' && renderAnalytics()}
             </div>
 
