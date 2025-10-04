@@ -22,7 +22,7 @@ const ExhibitorLogin: React.FC = () => {
         setError('');
 
         try {
-            const success = await login(companyId.trim(), password);
+            const success = await login(companyId.trim());
 
             if (!success) {
                 setError('Invalid Company ID or Password');
