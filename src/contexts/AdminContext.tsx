@@ -217,15 +217,25 @@ export const AdminProvider: React.FC<AdminProviderProps> = ({ children }) => {
             // Handle meal claims
             if (mealClaimsResult.status === 'fulfilled' && mealClaimsResult.value.data) {
                 const mealClaims = mealClaimsResult.value.data || [];
-                // Sum quantities instead of counting claims
-                totalMealClaims = mealClaims.reduce((sum, claim) => sum + (claim.quantity || 1), 0);
+                // Sum quantities from meal claims table
+                const mealClaimsQuantitySum = mealClaims.reduce((sum, claim) => sum + (claim.quantity || 1), 0);
+
+                // Total meal claims = sum of quantities from meal_claims_table + count of claimed coupons (status false)
+                totalMealClaims = mealClaimsQuantitySum + claimedCoupons;
+
                 lunchClaims = mealClaims
                     .filter(c => c.meal_type === 'lunch')
                     .reduce((sum, claim) => sum + (claim.quantity || 1), 0);
                 dinnerClaims = mealClaims
                     .filter(c => c.meal_type === 'dinner')
                     .reduce((sum, claim) => sum + (claim.quantity || 1), 0);
-                console.log('AdminContext: Meal claims stats:', { totalMealClaims, lunchClaims, dinnerClaims });
+                console.log('AdminContext: Meal claims stats:', {
+                    mealClaimsQuantitySum,
+                    claimedCoupons,
+                    totalMealClaims,
+                    lunchClaims,
+                    dinnerClaims
+                });
             } else if (mealClaimsResult.status === 'rejected') {
                 console.error('AdminContext: Meal claims query failed:', mealClaimsResult.reason);
             }
@@ -766,12 +776,113 @@ export const AdminProvider: React.FC<AdminProviderProps> = ({ children }) => {
                     couponedAt: null,
                     expiresAt: null
                 })
-                .eq('id', participantId); // Using id field since it seems to be participant_id
+                .eq('id', participantId); // Using id field since it contains participant_id
 
             if (error) throw error;
             return true;
         } catch (error) {
             console.error('Error resetting participant coupons:', error);
+            return false;
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    // Get coupons for a specific participant
+    const getParticipantCoupons = async (participantId: string): Promise<CouponAdmin[]> => {
+        try {
+            const { data, error } = await supabase
+                .from('coupons')
+                .select(`
+                    *,
+                    participants(name, phoneNumber)
+                `)
+                .eq('id', participantId); // Query where coupons.id matches participant_id
+
+            if (error) throw error;
+
+            console.log('Raw coupon data:', data);
+
+            const mappedCoupons = (data || []).map((coupon, index) => {
+                console.log(`Coupon ${index}:`, {
+                    id: coupon.id,
+                    uniqueId: coupon.uniqueId,
+                    mealSlotId: coupon.mealSlotId,
+                    familymemberindex: coupon.familymemberindex,
+                    status: coupon.status
+                });
+
+                return {
+                    id: coupon.id,
+                    uniqueId: coupon.uniqueId || `fallback-${coupon.id}-${index}`, // Fallback if uniqueId is null
+                    participantId: coupon.id,
+                    participantName: coupon.participants?.name,
+                    participantPhone: coupon.participants?.phoneNumber,
+                    mealSlotId: coupon.mealSlotId,
+                    mealSlotName: coupon.mealSlotId, // Use mealSlotId as name since no meal_slots table
+                    familyMemberIndex: coupon.familymemberindex || 0,
+                    status: coupon.status ? 'available' : 'used' as 'available' | 'used', // Convert boolean to string with proper typing
+                    couponedAt: coupon.couponedAt,
+                    expiresAt: coupon.expiresAt,
+                    createdAt: coupon.created_at
+                };
+            });
+
+            console.log('Mapped coupons:', mappedCoupons);
+            return mappedCoupons;
+        } catch (error) {
+            console.error('Error getting participant coupons:', error);
+            return [];
+        }
+    };
+
+    // Toggle coupon status (claim/unclaim)
+    const toggleCouponStatus = async (couponId: string, currentStatus: boolean): Promise<boolean> => {
+        setIsLoading(true);
+        try {
+            const newStatus = !currentStatus; // Toggle the boolean status
+            const { error } = await supabase
+                .from('coupons')
+                .update({
+                    status: newStatus,
+                    couponedAt: newStatus ? null : new Date().toISOString(), // Set claimed time if claiming
+                    expiresAt: newStatus ? null : new Date(Date.now() + 30 * 60 * 1000).toISOString() // 30 min expiry if claiming
+                })
+                .eq('uniqueId', couponId);
+
+            if (error) throw error;
+
+            // Refresh data to update the UI
+            await refreshStats();
+            return true;
+        } catch (error) {
+            console.error('Error toggling coupon status:', error);
+            return false;
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    // Claim a specific coupon (set status to false)
+    const claimCoupon = async (couponId: string): Promise<boolean> => {
+        setIsLoading(true);
+        try {
+            const { error } = await supabase
+                .from('coupons')
+                .update({
+                    status: false, // false = claimed/used
+                    couponedAt: new Date().toISOString(),
+                    expiresAt: new Date(Date.now() + 30 * 60 * 1000).toISOString() // 30 min expiry
+                })
+                .eq('uniqueId', couponId);
+
+            if (error) throw error;
+
+            // Refresh data to update the UI
+            await refreshStats();
+            return true;
+        } catch (error) {
+            console.error('Error claiming coupon:', error);
             return false;
         } finally {
             setIsLoading(false);
@@ -1074,6 +1185,9 @@ export const AdminProvider: React.FC<AdminProviderProps> = ({ children }) => {
         resetCoupon,
         resetAllCoupons,
         resetParticipantCoupons,
+        getParticipantCoupons,
+        toggleCouponStatus,
+        claimCoupon,
         getMealClaims,
         resetMealClaim,
         claimExhibitorMeal,

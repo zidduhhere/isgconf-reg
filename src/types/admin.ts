@@ -136,6 +136,9 @@ export interface AdminContextType {
   resetCoupon: (couponId: string) => Promise<boolean>;
   resetAllCoupons: () => Promise<boolean>;
   resetParticipantCoupons: (participantId: string) => Promise<boolean>;
+  getParticipantCoupons: (participantId: string) => Promise<CouponAdmin[]>;
+  toggleCouponStatus: (couponId: string, currentStatus: boolean) => Promise<boolean>;
+  claimCoupon: (couponId: string) => Promise<boolean>;
   
   // Meal Claims
   getMealClaims: () => Promise<MealClaimAdmin[]>;

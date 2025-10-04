@@ -19,7 +19,8 @@ import {
     Star,
     Circle,
     AlertCircle,
-    Shield
+    Shield,
+    Edit
 } from 'lucide-react';
 import { ParticipantAdmin, ExhibitorAdmin, ExhibitorEmployeeAdmin, CouponAdmin, MealClaimAdmin, RegistrationAdmin } from '../../types/admin';
 
@@ -42,6 +43,9 @@ export const AdminDashboardNew: React.FC = () => {
         resetCoupon,
         resetAllCoupons,
         resetParticipantCoupons,
+        getParticipantCoupons,
+        toggleCouponStatus,
+        claimCoupon,
         getMealClaims,
         resetMealClaim,
         claimExhibitorMeal,
@@ -85,6 +89,12 @@ export const AdminDashboardNew: React.FC = () => {
         employeeId: '',
         quantity: 1
     });
+
+    // Coupon management state
+    const [showCouponModal, setShowCouponModal] = useState(false);
+    const [selectedParticipantForCoupons, setSelectedParticipantForCoupons] = useState<ParticipantAdmin | null>(null);
+    const [participantCoupons, setParticipantCoupons] = useState<CouponAdmin[]>([]);
+    const [loadingCoupons, setLoadingCoupons] = useState(false);
 
     // Data for dropdowns
     const [companies, setCompanies] = useState<{ id: string; name: string }[]>([]);
@@ -299,6 +309,49 @@ export const AdminDashboardNew: React.FC = () => {
         } catch (error) {
             console.error('Error loading employees:', error);
             setCompanyEmployees([]);
+        }
+    };
+
+    // Coupon management functions
+    const handleViewParticipantCoupons = async (participant: ParticipantAdmin) => {
+        setSelectedParticipantForCoupons(participant);
+        setLoadingCoupons(true);
+        setShowCouponModal(true);
+
+        try {
+            const coupons = await getParticipantCoupons(participant.id);
+            setParticipantCoupons(coupons);
+        } catch (error) {
+            console.error('Error loading participant coupons:', error);
+            setParticipantCoupons([]);
+        } finally {
+            setLoadingCoupons(false);
+        }
+    };
+
+    const handleToggleCouponStatus = async (couponId: string, currentStatus: boolean) => {
+        try {
+            const success = await toggleCouponStatus(couponId, currentStatus);
+            if (success && selectedParticipantForCoupons) {
+                // Refresh the coupon list
+                const updatedCoupons = await getParticipantCoupons(selectedParticipantForCoupons.id);
+                setParticipantCoupons(updatedCoupons);
+            }
+        } catch (error) {
+            console.error('Error toggling coupon status:', error);
+        }
+    };
+
+    const handleClaimCoupon = async (couponId: string) => {
+        try {
+            const success = await claimCoupon(couponId);
+            if (success && selectedParticipantForCoupons) {
+                // Refresh the coupon list
+                const updatedCoupons = await getParticipantCoupons(selectedParticipantForCoupons.id);
+                setParticipantCoupons(updatedCoupons);
+            }
+        } catch (error) {
+            console.error('Error claiming coupon:', error);
         }
     };
 
@@ -553,6 +606,13 @@ export const AdminDashboardNew: React.FC = () => {
                                                     title="Register for Event"
                                                 >
                                                     <UserPlus className="h-4 w-4" />
+                                                </button>
+                                                <button
+                                                    onClick={() => handleViewParticipantCoupons(participant)}
+                                                    className="text-green-600 hover:text-green-900"
+                                                    title="Manage Coupons"
+                                                >
+                                                    <Edit className="h-4 w-4" />
                                                 </button>
                                                 <button
                                                     onClick={() => resetParticipantCoupons(participant.id)}
@@ -1400,6 +1460,119 @@ export const AdminDashboardNew: React.FC = () => {
                                     </button>
                                 </div>
                             </form>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Coupon Management Modal */}
+            {showCouponModal && selectedParticipantForCoupons && (
+                <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+                    <div className="relative top-20 mx-auto p-5 border w-11/12 max-w-4xl shadow-lg rounded-md bg-white">
+                        <div className="flex items-center justify-between mb-4">
+                            <h3 className="text-lg font-medium text-gray-900">
+                                Manage Coupons - {selectedParticipantForCoupons.name}
+                            </h3>
+                            <button
+                                onClick={() => setShowCouponModal(false)}
+                                className="text-gray-400 hover:text-gray-600"
+                            >
+                                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
+                        </div>
+
+                        <div className="mt-4">
+                            {loadingCoupons ? (
+                                <div className="flex justify-center py-8">
+                                    <RefreshCw className="h-8 w-8 animate-spin text-gray-400" />
+                                </div>
+                            ) : (
+                                <div className="overflow-x-auto">
+                                    <table className="min-w-full divide-y divide-gray-200">
+                                        <thead className="bg-gray-50">
+                                            <tr>
+                                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                                    Coupon ID
+                                                </th>
+                                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                                    Meal Slot
+                                                </th>
+                                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                                    Family Member
+                                                </th>
+                                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                                    Status
+                                                </th>
+                                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                                    Claimed At
+                                                </th>
+                                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                                    Actions
+                                                </th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="bg-white divide-y divide-gray-200">
+                                            {participantCoupons.map((coupon) => (
+                                                <tr key={coupon.uniqueId} className="hover:bg-gray-50">
+                                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                                        {coupon.uniqueId.slice(0, 8)}...
+                                                    </td>
+                                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                                        {coupon.mealSlotName || coupon.mealSlotId}
+                                                    </td>
+                                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                                        {coupon.familyMemberIndex === 0 ? 'Self' : `Family ${coupon.familyMemberIndex}`}
+                                                    </td>
+                                                    <td className="px-6 py-4 whitespace-nowrap">
+                                                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${coupon.status === 'used' ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'
+                                                            }`}>
+                                                            {coupon.status === 'used' ? 'Claimed' : 'Available'}
+                                                        </span>
+                                                    </td>
+                                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                                        {coupon.couponedAt ? new Date(coupon.couponedAt).toLocaleString() : '-'}
+                                                    </td>
+                                                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                                        <div className="flex space-x-2">
+                                                            {coupon.status === 'available' ? (
+                                                                <button
+                                                                    onClick={() => handleClaimCoupon(coupon.uniqueId)}
+                                                                    className="px-3 py-1 rounded text-xs font-medium bg-red-100 text-red-800 hover:bg-red-200"
+                                                                >
+                                                                    Claim
+                                                                </button>
+                                                            ) : (
+                                                                <button
+                                                                    onClick={() => handleToggleCouponStatus(coupon.uniqueId, false)}
+                                                                    className="px-3 py-1 rounded text-xs font-medium bg-green-100 text-green-800 hover:bg-green-200"
+                                                                >
+                                                                    Mark Available
+                                                                </button>
+                                                            )}
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                    {participantCoupons.length === 0 && (
+                                        <div className="text-center py-8">
+                                            <p className="text-gray-500">No coupons found for this participant.</p>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="mt-6 flex justify-end">
+                            <button
+                                onClick={() => setShowCouponModal(false)}
+                                className="px-4 py-2 bg-gray-300 text-gray-700 rounded-md text-sm font-medium hover:bg-gray-400"
+                            >
+                                Close
+                            </button>
                         </div>
                     </div>
                 </div>
