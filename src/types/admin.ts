@@ -20,6 +20,9 @@ export interface AdminStats {
   totalMealClaims: number;
   lunchClaims: number;
   dinnerClaims: number;
+  lunch1Count: number;
+  lunch2Count: number;
+  dinnerCount: number;
 }
 
 export interface ParticipantAdmin {

@@ -23,7 +23,9 @@ import {
     AlertCircle,
     Shield,
     Edit,
-    UserCheck
+    UserCheck,
+    Plus,
+    Minus
 } from 'lucide-react';
 import { ParticipantAdmin, ExhibitorAdmin, ExhibitorEmployeeAdmin, CouponAdmin, MealClaimAdmin, RegistrationAdmin } from '../../types/admin';
 
@@ -37,6 +39,7 @@ export const AdminDashboardNew: React.FC = () => {
         refreshStats,
         getParticipants,
         addParticipant,
+        updateParticipant,
         deleteParticipant,
         getExhibitors,
         addExhibitor,
@@ -252,6 +255,34 @@ export const AdminDashboardNew: React.FC = () => {
         }
     };
 
+    const handleUpdateFamilySize = async (participantId: string, currentSize: number, delta: number) => {
+        const newSize = currentSize + delta;
+        if (newSize < 1) {
+            alert('Family size cannot be less than 1');
+            return;
+        }
+        if (newSize > 10) {
+            alert('Family size cannot exceed 10 members');
+            return;
+        }
+
+        const success = await updateParticipant(participantId, { familySize: newSize });
+        if (success) {
+            loadData(); // Refresh data to show updated family size
+            await refreshStats(); // Refresh stats to update totals
+
+            // If the modal is open and showing this participant, update the modal data too
+            if (selectedParticipantForCoupons && selectedParticipantForCoupons.id === participantId) {
+                setSelectedParticipantForCoupons({
+                    ...selectedParticipantForCoupons,
+                    familySize: newSize
+                });
+            }
+        } else {
+            alert('Failed to update family size. Please try again.');
+        }
+    };
+
     const handleDeleteExhibitor = async (id: string) => {
         if (window.confirm('Are you sure you want to delete this exhibitor? This will also delete all their meal claims.')) {
             const success = await deleteExhibitor(id);
@@ -381,7 +412,7 @@ export const AdminDashboardNew: React.FC = () => {
 
     const renderOverview = () => (
         <div className="space-y-6">
-            {/* Stats Cards - 2x4 Grid */}
+            {/* Stats Cards - 3x4 Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 {/* First Row */}
                 <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
@@ -528,44 +559,80 @@ export const AdminDashboardNew: React.FC = () => {
                         </div>
                     </div>
                 </div>
-            </div>
 
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-                <div className="flex items-center">
-                    <div className="flex-shrink-0">
-                        <Ticket className="h-8 w-8 text-green-600" />
+                {/* Third Row - Meal Slot Counts */}
+                <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                    <div className="flex items-center">
+                        <div className="flex-shrink-0">
+                            <UtensilsCrossed className="h-8 w-8 text-blue-600" />
+                        </div>
+                        <div className="ml-5 w-0 flex-1">
+                            <dl>
+                                <dt className="text-sm font-medium text-gray-500 truncate">
+                                    Lunch 1 Claims
+                                </dt>
+                                <dd className="text-2xl font-semibold text-gray-900">
+                                    {stats?.lunch1Count || 0}
+                                </dd>
+                            </dl>
+                        </div>
                     </div>
-                    <div className="ml-5 w-0 flex-1">
-                        <dl>
-                            <dt className="text-sm font-medium text-gray-500 truncate">
-                                Active Coupons
-                            </dt>
-                            <dd className="text-2xl font-semibold text-gray-900">
-                                {stats?.activeCoupons || 0}
-                            </dd>
-                        </dl>
+                </div>
+
+                <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                    <div className="flex items-center">
+                        <div className="flex-shrink-0">
+                            <UtensilsCrossed className="h-8 w-8 text-green-600" />
+                        </div>
+                        <div className="ml-5 w-0 flex-1">
+                            <dl>
+                                <dt className="text-sm font-medium text-gray-500 truncate">
+                                    Lunch 2 Claims
+                                </dt>
+                                <dd className="text-2xl font-semibold text-gray-900">
+                                    {stats?.lunch2Count || 0}
+                                </dd>
+                            </dl>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                    <div className="flex items-center">
+                        <div className="flex-shrink-0">
+                            <UtensilsCrossed className="h-8 w-8 text-purple-600" />
+                        </div>
+                        <div className="ml-5 w-0 flex-1">
+                            <dl>
+                                <dt className="text-sm font-medium text-gray-500 truncate">
+                                    Dinner Claims
+                                </dt>
+                                <dd className="text-2xl font-semibold text-gray-900">
+                                    {stats?.dinnerCount || 0}
+                                </dd>
+                            </dl>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                    <div className="flex items-center">
+                        <div className="flex-shrink-0">
+                            <BarChart3 className="h-8 w-8 text-slate-600" />
+                        </div>
+                        <div className="ml-5 w-0 flex-1">
+                            <dl>
+                                <dt className="text-sm font-medium text-gray-500 truncate">
+                                    Analytics
+                                </dt>
+                                <dd className="text-2xl font-semibold text-gray-900">
+                                    View More
+                                </dd>
+                            </dl>
+                        </div>
                     </div>
                 </div>
             </div>
-
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-                <div className="flex items-center">
-                    <div className="flex-shrink-0">
-                        <UtensilsCrossed className="h-8 w-8 text-orange-600" />
-                    </div>
-                    <div className="ml-5 w-0 flex-1">
-                        <dl>
-                            <dt className="text-sm font-medium text-gray-500 truncate">
-                                Meal Claims
-                            </dt>
-                            <dd className="text-2xl font-semibold text-gray-900">
-                                {stats?.totalMealClaims || 0}
-                            </dd>
-                        </dl>
-                    </div>
-                </div>
-            </div>
-
 
             {/* Quick Actions */}
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
@@ -617,15 +684,19 @@ export const AdminDashboardNew: React.FC = () => {
                         </div>
                     </div>
                     <div>
-                        <h4 className="text-sm font-medium text-gray-700 mb-3">Meal Claims</h4>
+                        <h4 className="text-sm font-medium text-gray-700 mb-3">Meal Slot Claims</h4>
                         <div className="space-y-2">
                             <div className="flex justify-between">
-                                <span className="text-sm text-gray-600">Lunch Claims</span>
-                                <span className="text-sm font-medium text-blue-600">{stats?.lunchClaims || 0}</span>
+                                <span className="text-sm text-gray-600">Lunch 1</span>
+                                <span className="text-sm font-medium text-blue-600">{stats?.lunch1Count || 0}</span>
                             </div>
                             <div className="flex justify-between">
-                                <span className="text-sm text-gray-600">Dinner Claims</span>
-                                <span className="text-sm font-medium text-purple-600">{stats?.dinnerClaims || 0}</span>
+                                <span className="text-sm text-gray-600">Lunch 2</span>
+                                <span className="text-sm font-medium text-green-600">{stats?.lunch2Count || 0}</span>
+                            </div>
+                            <div className="flex justify-between">
+                                <span className="text-sm text-gray-600">Dinner</span>
+                                <span className="text-sm font-medium text-purple-600">{stats?.dinnerCount || 0}</span>
                             </div>
                         </div>
                     </div>
@@ -718,10 +789,28 @@ export const AdminDashboardNew: React.FC = () => {
                                             {participant.phoneNumber}
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap">
-                                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${participant.isFam ? 'bg-purple-100 text-purple-800' : 'bg-gray-100 text-gray-800'
-                                                }`}>
-                                                {participant.familySize} {participant.isFam ? 'Family' : 'Individual'}
-                                            </span>
+                                            <div className="flex items-center space-x-2">
+                                                <button
+                                                    onClick={() => handleUpdateFamilySize(participant.id, participant.familySize, -1)}
+                                                    className="p-1 text-gray-400 hover:text-red-600 transition-colors"
+                                                    disabled={participant.familySize <= 1}
+                                                    title="Decrease family size"
+                                                >
+                                                    <Minus className="w-4 h-4" />
+                                                </button>
+                                                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${participant.isFam ? 'bg-purple-100 text-purple-800' : 'bg-gray-100 text-gray-800'
+                                                    }`}>
+                                                    {participant.familySize} {participant.isFam ? 'Family' : 'Individual'}
+                                                </span>
+                                                <button
+                                                    onClick={() => handleUpdateFamilySize(participant.id, participant.familySize, 1)}
+                                                    className="p-1 text-gray-400 hover:text-green-600 transition-colors"
+                                                    disabled={participant.familySize >= 10}
+                                                    title="Increase family size"
+                                                >
+                                                    <Plus className="w-4 h-4" />
+                                                </button>
+                                            </div>
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap">
                                             <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${participant.isFaculty ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800'
@@ -1667,9 +1756,36 @@ export const AdminDashboardNew: React.FC = () => {
                 <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
                     <div className="relative top-20 mx-auto p-5 border w-11/12 max-w-4xl shadow-lg rounded-md bg-white">
                         <div className="flex items-center justify-between mb-4">
-                            <h3 className="text-lg font-medium text-gray-900">
-                                Manage Coupons - {selectedParticipantForCoupons.name}
-                            </h3>
+                            <div>
+                                <h3 className="text-lg font-medium text-gray-900">
+                                    Manage Coupons - {selectedParticipantForCoupons.name}
+                                </h3>
+                                <div className="flex items-center mt-2 space-x-4">
+                                    <span className="text-sm text-gray-600">
+                                        Phone: {selectedParticipantForCoupons.phoneNumber}
+                                    </span>
+                                    <div className="flex items-center space-x-2">
+                                        <span className="text-sm text-gray-600">Family Size:</span>
+                                        <button
+                                            onClick={() => handleUpdateFamilySize(selectedParticipantForCoupons.id, selectedParticipantForCoupons.familySize, -1)}
+                                            className="inline-flex items-center p-1 border border-gray-300 rounded-md text-gray-600 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                            disabled={selectedParticipantForCoupons.familySize <= 1}
+                                        >
+                                            <Minus className="h-4 w-4" />
+                                        </button>
+                                        <span className="text-sm font-medium text-gray-900 min-w-[2rem] text-center">
+                                            {selectedParticipantForCoupons.familySize}
+                                        </span>
+                                        <button
+                                            onClick={() => handleUpdateFamilySize(selectedParticipantForCoupons.id, selectedParticipantForCoupons.familySize, 1)}
+                                            className="inline-flex items-center p-1 border border-gray-300 rounded-md text-gray-600 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                            disabled={selectedParticipantForCoupons.familySize >= 10}
+                                        >
+                                            <Plus className="h-4 w-4" />
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
                             <button
                                 onClick={() => setShowCouponModal(false)}
                                 className="text-gray-400 hover:text-gray-600"

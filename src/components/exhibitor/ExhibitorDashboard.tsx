@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
     Building2,
     UtensilsCrossed,
@@ -61,6 +62,8 @@ const ExhibitorDashboard: React.FC = () => {
         refreshData
     } = useExhibitor();
 
+    const navigate = useNavigate();
+
     const [isClaimingMeal, setIsClaimingMeal] = useState<string | null>(null);
     const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>('');
 
@@ -71,7 +74,7 @@ const ExhibitorDashboard: React.FC = () => {
             console.log('ExhibitorDashboard: Loading data for company:', currentCompany);
             refreshData();
         }
-    }, [currentCompany?.id, refreshData]); // Only depend on company ID, not the entire company object
+    }, [currentCompany?.id]); // Remove refreshData from dependencies to prevent infinite loop
 
     // Set default employee if there's only one employee
     useEffect(() => {
@@ -79,6 +82,17 @@ const ExhibitorDashboard: React.FC = () => {
             setSelectedEmployeeId(employees[0].id);
         }
     }, [employees, selectedEmployeeId]);
+
+    const handleLogout = async () => {
+        try {
+            await logout();
+            navigate('/exhibitor-login'); // Navigate to exhibitor login page
+        } catch (error) {
+            console.error('Logout error:', error);
+            // Even if logout fails, navigate to login
+            navigate('/exhibitor-login');
+        }
+    };
 
     const handleClaimMeal = async (mealSlotId: string, mealType: 'lunch' | 'dinner', quantity: number) => {
         if (!currentCompany || isClaimingMeal || !selectedEmployeeId) {
@@ -150,7 +164,7 @@ const ExhibitorDashboard: React.FC = () => {
                         </div>
 
                         <button
-                            onClick={logout}
+                            onClick={handleLogout}
                             className="flex items-center space-x-2 px-4 py-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition duration-200"
                         >
                             <LogOut className="h-5 w-5" />

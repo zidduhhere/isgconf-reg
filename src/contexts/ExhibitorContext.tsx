@@ -176,6 +176,39 @@ export const ExhibitorProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         setMealClaims([]);
     }, []);
 
+    // Add beforeunload event listener for refresh confirmation
+    useEffect(() => {
+        const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+            if (currentCompany) {
+                // Show browser's default confirmation dialog
+                event.preventDefault();
+                event.returnValue = 'You will be logged out if you refresh the page. Are you sure?';
+
+                // When the page actually unloads, logout
+                // Note: We can't control what happens after user confirms
+                // but we'll handle logout in a separate unload handler
+                return 'You will be logged out if you refresh the page. Are you sure?';
+            }
+        };
+
+        const handleUnload = () => {
+            if (currentCompany) {
+                // User confirmed to leave, logout
+                logout();
+            }
+        };
+
+        if (currentCompany) {
+            window.addEventListener('beforeunload', handleBeforeUnload);
+            window.addEventListener('unload', handleUnload);
+        }
+
+        return () => {
+            window.removeEventListener('beforeunload', handleBeforeUnload);
+            window.removeEventListener('unload', handleUnload);
+        };
+    }, [currentCompany, logout]);
+
     const getEmployeesFromSupabase = useCallback(async (): Promise<ExhibitorEmployee[]> => {
         if (!currentCompany) return [];
 
@@ -342,7 +375,7 @@ export const ExhibitorProvider: React.FC<{ children: React.ReactNode }> = ({ chi
                 .upsert({
                     company_id: currentCompany.id,
                     employee_id: employeeId,
-                    meal_slot_id: mealSlotId, // Use snake_case for database consistency
+                    mealSlotId: mealSlotId, // Use camelCase to match database schema
                     meal_type: mealType,
                     status: false, // false = claimed
                     claimed_at: new Date().toISOString(),
@@ -367,7 +400,7 @@ export const ExhibitorProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         id: dbClaim.id,
         companyId: dbClaim.company_id,
         employeeId: dbClaim.employee_id,
-        mealSlotId: dbClaim.meal_slot_id || dbClaim.mealSlotId, // Handle both snake_case and camelCase
+        mealSlotId: dbClaim.mealSlotId || dbClaim.meal_slot_id, // Handle both camelCase and snake_case
         mealType: dbClaim.meal_type,
         quantity: dbClaim.quantity || 1, // Use actual quantity from database, fallback to 1
         status: dbClaim.status,
@@ -593,7 +626,7 @@ export const ExhibitorProvider: React.FC<{ children: React.ReactNode }> = ({ chi
                     .from('exhibitor_meal_claims')
                     .select('*')
                     .eq('company_id', currentCompany.id)
-                    .eq('meal_slot_id', mealSlotId) // Use snake_case for database consistency
+                    .eq('mealSlotId', mealSlotId) // Use camelCase to match database schema
                     .eq('meal_type', mealType)
                     .maybeSingle(); // Use maybeSingle to get null if no record exists
 
@@ -615,7 +648,7 @@ export const ExhibitorProvider: React.FC<{ children: React.ReactNode }> = ({ chi
                     .insert({
                         company_id: currentCompany.id,
                         employee_id: employeeId, // Associate with specific employee
-                        meal_slot_id: mealSlotId, // Use snake_case for database consistency
+                        mealSlotId: mealSlotId, // Use camelCase to match database schema
                         meal_type: mealType,
                         quantity: quantity,
                         status: false, // false = claimed

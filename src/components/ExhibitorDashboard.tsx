@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
     Building2,
     UtensilsCrossed,
@@ -51,11 +52,14 @@ const getPlanColor = (plan: string) => {
 const ExhibitorDashboard: React.FC = () => {
     const {
         currentCompany,
+        employees,
         logout,
         getAvailableAllocations,
         claimMealBulk,
         refreshData
     } = useExhibitor();
+
+    const navigate = useNavigate();
 
     const [isClaimingMeal, setIsClaimingMeal] = useState<string | null>(null);
 
@@ -66,7 +70,18 @@ const ExhibitorDashboard: React.FC = () => {
             console.log('ExhibitorDashboard: Loading data for company:', currentCompany);
             refreshData();
         }
-    }, [currentCompany, refreshData]);
+    }, [currentCompany]); // Remove refreshData from dependencies to prevent infinite loop
+
+    const handleLogout = async () => {
+        try {
+            await logout();
+            navigate('/exhibitor-login'); // Navigate to exhibitor login page
+        } catch (error) {
+            console.error('Logout error:', error);
+            // Even if logout fails, navigate to login
+            navigate('/exhibitor-login');
+        }
+    };
 
     const handleClaimMeal = async (mealSlotId: string, mealType: 'lunch' | 'dinner', quantity: number) => {
         if (!currentCompany || isClaimingMeal) return;
@@ -81,7 +96,9 @@ const ExhibitorDashboard: React.FC = () => {
         setIsClaimingMeal(mealSlotId);
 
         try {
-            const success = await claimMealBulk(mealSlotId, mealType, quantity);
+            // For bulk claims, use the first employee or company admin
+            const employeeId = employees.length > 0 ? employees[0].id : currentCompany.id;
+            const success = await claimMealBulk(mealSlotId, mealType, quantity, employeeId);
 
             if (success) {
                 await refreshData(); // Refresh to get updated counts
@@ -122,7 +139,7 @@ const ExhibitorDashboard: React.FC = () => {
                         </div>
 
                         <button
-                            onClick={logout}
+                            onClick={handleLogout}
                             className="flex items-center space-x-2 px-4 py-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition duration-200"
                         >
                             <LogOut className="h-5 w-5" />

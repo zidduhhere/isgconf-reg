@@ -121,6 +121,37 @@ export const AdminProvider: React.FC<AdminProviderProps> = ({ children }) => {
         setStats(null);
     };
 
+    // Add beforeunload event listener for refresh confirmation
+    useEffect(() => {
+        const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+            if (currentAdmin || isAdminAuthenticated) {
+                // Show browser's default confirmation dialog
+                event.preventDefault();
+                event.returnValue = 'You will be logged out if you refresh the page. Are you sure?';
+
+                return 'You will be logged out if you refresh the page. Are you sure?';
+            }
+        };
+
+        const handleUnload = () => {
+            if (currentAdmin || isAdminAuthenticated) {
+                // User confirmed to leave, logout
+                logout();
+                logoutLegacy();
+            }
+        };
+
+        if (currentAdmin || isAdminAuthenticated) {
+            window.addEventListener('beforeunload', handleBeforeUnload);
+            window.addEventListener('unload', handleUnload);
+        }
+
+        return () => {
+            window.removeEventListener('beforeunload', handleBeforeUnload);
+            window.removeEventListener('unload', handleUnload);
+        };
+    }, [currentAdmin, isAdminAuthenticated]);
+
     // Data refresh functions
     const refreshData = async () => {
         try {
@@ -190,6 +221,9 @@ export const AdminProvider: React.FC<AdminProviderProps> = ({ children }) => {
             let totalMealClaims = 0;
             let lunchClaims = 0;
             let dinnerClaims = 0;
+            let lunch1Count = 0;
+            let lunch2Count = 0;
+            let dinnerCount = 0;
 
             // Handle participants
             if (participantsResult.status === 'fulfilled' && participantsResult.value.data) {
@@ -246,6 +280,19 @@ export const AdminProvider: React.FC<AdminProviderProps> = ({ children }) => {
                 activeCoupons = coupons.filter(c => c.status === true).length; // true = available
                 claimedCoupons = coupons.filter(c => c.status === false).length; // false = used/claimed
                 expiredCoupons = 0; // No expired status in boolean schema
+
+                // Count meal slot specific claims from coupons (participant claims)
+                const claimedCouponsData = coupons.filter(c => c.status === false);
+                lunch1Count += claimedCouponsData.filter((c: any) =>
+                    c.mealSlotId === 'lunch_1' || c.mealSlotId === '0' || c.mealSlotId === 'fam_lunch_1'
+                ).length;
+                lunch2Count += claimedCouponsData.filter((c: any) =>
+                    c.mealSlotId === 'lunch_2' || c.mealSlotId === '2' || c.mealSlotId === 'fam_lunch_2'
+                ).length;
+                dinnerCount += claimedCouponsData.filter((c: any) =>
+                    c.mealSlotId === 'gala_1' || c.mealSlotId === '1' || c.mealSlotId === 'fam_gala'
+                ).length;
+
                 console.log('AdminContext: Coupons stats:', { totalCoupons, activeCoupons, claimedCoupons });
             } else if (couponsResult.status === 'rejected') {
                 console.error('AdminContext: Coupons query failed:', couponsResult.reason);
@@ -266,12 +313,29 @@ export const AdminProvider: React.FC<AdminProviderProps> = ({ children }) => {
                 dinnerClaims = mealClaims
                     .filter(c => c.meal_type === 'dinner')
                     .reduce((sum, claim) => sum + (claim.quantity || 1), 0);
+
+                // Add exhibitor meal claims to specific slot counts
+                lunch1Count += mealClaims.filter((c: any) =>
+                    c.meal_type === 'lunch' && (c.mealSlotId === 'lunch_1' || c.mealSlotId === '0')
+                ).reduce((sum: number, claim: any) => sum + (claim.quantity || 1), 0);
+
+                lunch2Count += mealClaims.filter((c: any) =>
+                    c.meal_type === 'lunch' && (c.mealSlotId === 'lunch_2' || c.mealSlotId === '2')
+                ).reduce((sum: number, claim: any) => sum + (claim.quantity || 1), 0);
+
+                dinnerCount += mealClaims.filter((c: any) =>
+                    c.meal_type === 'dinner' && (c.mealSlotId === 'gala_1' || c.mealSlotId === '1')
+                ).reduce((sum: number, claim: any) => sum + (claim.quantity || 1), 0);
+
                 console.log('AdminContext: Meal claims stats:', {
                     mealClaimsQuantitySum,
                     claimedCoupons,
                     totalMealClaims,
                     lunchClaims,
-                    dinnerClaims
+                    dinnerClaims,
+                    lunch1Count,
+                    lunch2Count,
+                    dinnerCount
                 });
             } else if (mealClaimsResult.status === 'rejected') {
                 console.error('AdminContext: Meal claims query failed:', mealClaimsResult.reason);
@@ -290,7 +354,10 @@ export const AdminProvider: React.FC<AdminProviderProps> = ({ children }) => {
                 expiredCoupons,
                 totalMealClaims,
                 lunchClaims,
-                dinnerClaims
+                dinnerClaims,
+                lunch1Count,
+                lunch2Count,
+                dinnerCount
             };
 
             console.log('AdminContext: Final stats:', finalStats);
@@ -311,7 +378,10 @@ export const AdminProvider: React.FC<AdminProviderProps> = ({ children }) => {
                 expiredCoupons: 0,
                 totalMealClaims: 0,
                 lunchClaims: 0,
-                dinnerClaims: 0
+                dinnerClaims: 0,
+                lunch1Count: 0,
+                lunch2Count: 0,
+                dinnerCount: 0
             });
         } finally {
             setIsLoading(false);
